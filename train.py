@@ -83,7 +83,7 @@ DROPOUT = 0.0                   # dropout probability
 # Optimization
 BATCH_SIZE = 512                # mini-batch size
 LR = 1e-3                       # peak learning rate (AdamW)
-WEIGHT_DECAY = 1e-4             # L2 regularisation
+WEIGHT_DECAY = 1e-5             # L2 regularisation
 GRAD_CLIP = 1.0                 # gradient norm clip
 WARMUP_RATIO = 0.1              # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.4            # fraction of time budget for LR warmdown
