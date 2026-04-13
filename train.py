@@ -88,6 +88,7 @@ GRAD_CLIP = 1.0                 # gradient norm clip
 WARMUP_RATIO = 0.05             # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.4            # fraction of time budget for LR warmdown
 FINAL_LR_FRAC = 0.01            # final LR as fraction of peak
+HUBER_BETA = 1.0                # SmoothL1 beta (targets are standardized)
 
 # ---------------------------------------------------------------------------
 # Setup: data, model, optimizer
@@ -161,7 +162,7 @@ while True:
         model.train()
         optimizer.zero_grad(set_to_none=True)
         pred = model(x_batch)
-        loss = F.mse_loss(pred, y_batch)
+        loss = F.smooth_l1_loss(pred, y_batch, beta=HUBER_BETA)
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
         optimizer.step()
