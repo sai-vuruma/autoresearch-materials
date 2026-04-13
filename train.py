@@ -77,7 +77,7 @@ class ModelWrapper:
 # ---------------------------------------------------------------------------
 
 # Model architecture
-HIDDEN_DIMS = (512, 512, 256)   # hidden layer sizes
+HIDDEN_DIMS = (1024, 512, 256)  # hidden layer sizes
 DROPOUT = 0.0                   # dropout probability
 
 # Optimization
