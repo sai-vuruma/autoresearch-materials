@@ -1,0 +1,14 @@
+Device: cpu
+Model: HistGradientBoostingRegressor
+Time budget:      300s
+Training samples: 800
+---
+val_mae:          16.985010
+val_r2:           -3.806568
+val_rmse:         19.142712
+training_seconds: 2.3
+total_seconds:    2.3
+peak_vram_mb:     0.0
+num_steps:        500
+num_params:       500
+num_epochs:       1

@@ -1,0 +1,26 @@
+commit	val_mae	memory_gb	status	description
+d9045f4	35.457959	0.0	keep	baseline
+c791c36	15.577895	0.0	keep	scale targets
+6116c86	15.512846	0.0	keep	use huber loss
+146cf3a	14.719866	0.0	keep	wider mlp no dropout
+7988179	13.986138	0.0	keep	batch size 128
+f6ee5b7	14.652063	0.0	discard	lr 2e-3
+90ba5eb	12.873423	0.0	keep	batch size 256
+b217133	13.989143	0.0	discard	widen first layer
+825ec9a	12.747167	0.0	keep	warmup 10%
+b87cad9	12.764275	0.0	discard	warmdown 20%
+fb67954	12.292843	0.0	keep	batch size 512
+6cfb61a	15.291019	0.0	discard	batch size 1024
+1f899f8	13.891861	0.0	discard	lr 5e-4
+a93a059	12.345908	0.0	discard	no weight decay
+fb59e0c	12.255489	0.0	keep	weight decay 1e-5
+44910b6	12.393704	0.0	discard	widen last layer
+21959bf	12.518058	0.0	discard	lr 8e-4
+8090470	12.724555	0.0	discard	final lr frac 0.05
+2c0cd54	31.489112	0.0	discard	disable grad clip
+eaa52e9	12.615657	0.0	discard	huber beta 0.5
+dffe6b7	13.007092	0.0	discard	batch size 384
+4e2be7d	12.354940	0.0	discard	huber beta 0.8
+29c50f9	12.501409	0.0	discard	add fourth layer
+6110fc4	13.348079	0.0	discard	dropout 0.05
+1d1a640	13.420182	0.0	discard	lr 1.2e-3
