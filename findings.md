@@ -18,6 +18,7 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - Lowering white-noise initialization from `0.3` to `0.1` also tied the incumbent (`5d23fde`).
 - A simple GP-plus-ridge ensemble regressed badly to val_mae 12.876797 (`6599c50`).
 - Training a supervised MLP encoder and fitting the GP on its learned latent features regressed badly to val_mae 14.918993 (`f236159`).
+- An age-binned REx MLP, a GP with age-bin indicator features, ExtraTrees, k-NN, kernel ridge, SVR, and shallow Huber boosting all regressed materially (`f3dc612`, `94fd26a`, `1c6e542`, `96d7e47`, `3ff80b9`, `79b60da`, `1190213`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
@@ -27,6 +28,7 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - The current input-space GP is in a local plateau: recent changes to restarts, weighting, normalization, and shallow ensembling all failed to improve `61fcde9`.
 - A learned latent space did not help here: replacing raw standardized features with a small supervised MLP encoder made the downstream GP much worse, so lack of learned representation is not the obvious bottleneck.
 - Stagnation note: there are now 10 consecutive discarded experiments since `61fcde9`. The exhausted space includes GP hyperparameter neighborhood tuning, simple reweighting, shallow ensembling, learned-latent GP, REx-style MLP, and environment-indicator feature augmentation. The bottleneck looks structural rather than a missed local GP setting.
+- The broader non-GP search also looks poor so far: tree ensembles, neighbor methods, and other kernel machines have all been substantially worse than the best GP.
 
 ## Unexplored directions
 - Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
@@ -34,3 +36,4 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
 - Try robust target transforms such as log1p if label distribution is skewed.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
+- Try remaining cheap structural baselines only if they are genuinely distinct: random forests, Bayesian linear models, or locally weighted regressors.
