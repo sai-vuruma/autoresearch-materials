@@ -12,7 +12,7 @@ from sklearn.compose import TransformedTargetRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
@@ -52,7 +52,7 @@ model = TransformedTargetRegressor(
             ),
         ]
     ),
-    transformer=StandardScaler(),
+    transformer=PowerTransformer(method="yeo-johnson", standardize=True),
 )
 
 t_start_training = time.time()
