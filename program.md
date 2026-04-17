@@ -6,12 +6,14 @@ This is an experiment to have the LLM do its own research.
 
 To set up a new experiment, work with the user to:
 
-1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `autoresearch/<tag>` must not already exist — this is a fresh run.
-2. **Create the branch**: `git checkout -b autoresearch/<tag>` from current master.
+1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `autoresearch-materials/<tag>` must not already exist — this is a fresh run.
+2. **Create the branch**: `git checkout -b autoresearch-materials/<tag>` from current master.
 3. **Read the in-scope files**: The repo is small. Read these files for full context:
    - `README.md` — repository context.
    - `prepare.py` — fixed constants, data prep, evaluation. Do not modify.
    - `train.py` — the file you modify. Model architecture, optimizer, training loop.
+   - `findings.md` — accumulated knowledge from prior sessions (if it exists). Read this first.
+   - `guidance.md` — human steering notes (if it exists). Follow any directions here.
 4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data. If not, tell the human to run `uv run prepare.py`.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
@@ -20,13 +22,15 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation) or **100 epochs** (whichever comes first). You launch it simply as: `uv run train.py`.
+Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
 
 **What you CAN do:**
 - Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+- Update `findings.md` — you must keep this file current (see Knowledge Management below).
 
 **What you CANNOT do:**
 - Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, and training constants (time budget, max epochs, etc).
+- Overfit models such as Neural Networks by setting the number of epochs to high values. Observe loss and use regularization for such approaches and reduce number of epochs accordingly to avoid overfitting.
 - Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
 - Modify the evaluation harness. The `evaluate_model` function in `prepare.py` is the ground truth metric.
 
@@ -87,23 +91,87 @@ c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
 d4e5f6g	0.000000	0.0	crash	double model width (OOM)
 ```
 
+## Knowledge management
+
+You maintain two files to preserve knowledge across experiments and sessions:
+
+### `findings.md` — what you know (required)
+
+After every 5 experiments (or after any significant discovery), update `findings.md`. This is the compressed knowledge that future sessions will read instead of parsing hundreds of results.tsv entries. Keep it under 200 lines. Structure:
+
+```markdown
+## Current best
+val_mae: X.XXXXXX (iter N, commit abc1234)
+Key config: depth=N, dim=N, batch=N, LR=X, ...
+
+## What works
+- [finding]: [evidence from which iter(s)]
+
+## What doesn't work
+- [thing tried]: [why it failed, iter(s)]
+
+## Structural findings
+- [architectural insight]: [evidence]
+
+## Unexplored directions
+- [idea]: [why it might work]
+```
+
+Commit `findings.md` to the branch alongside successful experiments. This file is your institutional memory — without it, the next session will waste GPU time re-discovering what you already know.
+
+### `guidance.md` — human steering (optional, read-only for you)
+
+If this file exists, read it before planning each experiment. It contains directions from the human operator:
+- Research goals or priorities
+- Constraints or preferences
+- Papers, ideas, or reference implementations to consider
+- Explicit instructions to change strategy
+
+You must follow guidance.md directions. You must NOT modify this file — it is the human's communication channel to you.
+
+## Stagnation detection
+
+Track your improvement trajectory. You are in a **stagnation plateau** when:
+- The last 10+ kept experiments each improved val_mae by less than 0.1% relative
+- OR the last 10+ experiments were all discarded/crashed
+
+When you detect stagnation, **switch modes**:
+
+1. **Stop parameter tuning.** Small LR/WD/batch adjustments will not break through a structural ceiling.
+2. **Write a stagnation note** in findings.md: document the current ceiling, what parameter space you've exhausted, and why you believe the architecture is the bottleneck.
+3. **Try structural changes**: fundamentally different architectures, not incremental tweaks. Examples:
+   - Different attention mechanism (linear attention, local+global hybrid)
+   - Different nonlinearity (GELU, SwiGLU, etc.)
+   - Different normalization (LayerNorm, DeepNorm)
+   - Different residual topology (DenseNet-style, U-Net skip connections)
+   - Significantly different model shape (much deeper+narrower, or shallower+wider)
+   - Different optimizer (Lion, Sophia, schedule-free Adam)
+4. **Rewind if needed.** If structural exploration leads to 3+ consecutive crashes or regressions, rewind to the last known good commit and try a *different* structural direction. Do not keep hammering the same failing approach.
+
+This prevents the depth-first search trap: you explore one direction deeply, but when it plateaus, you step back and try a fundamentally different path with the knowledge you've accumulated.
+
 ## The experiment loop
 
 The experiment runs on a dedicated branch (e.g. `autoresearch/mar5` or `autoresearch/mar5-gpu0`).
 
 LOOP FOREVER:
 
-1. Look at the git state: the current branch/commit we're on
-2. Tune `train.py` with an experimental idea by directly hacking the code.
+1. **Plan** (guidance step):
+   - Read `guidance.md` if it exists — follow any human directions.
+   - Read `findings.md` if it exists — review what's known.
+   - Check for stagnation (see above).
+   - Decide: parameter tuning or structural exploration? Write a one-line rationale.
+2. Tune `train.py` with the chosen experimental idea by directly hacking the code.
 3. git commit
 4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
 5. Read out the results: `grep "^val_mae:\|^peak_vram_mb:" run.log`
 6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
 7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
-8. If val_mae improved (lower), you "advance" the branch, keeping the git commit
-9. If val_mae is equal or worse, you git reset back to where you started
+8. If val_mae improved (lower), you "advance" the branch, keeping the git commit.
+9. If val_mae is equal or worse, you git reset back to where you started.
+10. Every 5 experiments: update `findings.md` and commit it.
 
-The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
+The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate.
 
 **Timeout**: Each experiment should take ~5 minutes total (+ a few seconds for startup and eval overhead). If a run exceeds 10 minutes, kill it and treat it as a failure (discard and revert).
 

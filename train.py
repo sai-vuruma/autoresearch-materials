@@ -56,9 +56,10 @@ class MLP(nn.Module):
 class ModelWrapper:
     """Wraps a trained PyTorch MLP with a sklearn-compatible predict() interface."""
 
-    def __init__(self, model, scaler, device):
+    def __init__(self, model, scaler, y_scaler, device):
         self.model = model
         self.scaler = scaler
+        self.y_scaler = y_scaler
         self.device = device
 
     def predict(self, X):
@@ -66,7 +67,8 @@ class ModelWrapper:
         X_scaled = self.scaler.transform(X)
         X_t = torch.tensor(X_scaled, dtype=torch.float32, device=self.device)
         with torch.no_grad():
-            preds = self.model(X_t).cpu().numpy()
+            preds = self.model(X_t).cpu().numpy().reshape(-1, 1)
+        preds = self.y_scaler.inverse_transform(preds).ravel()
         return preds
 
 
@@ -75,17 +77,18 @@ class ModelWrapper:
 # ---------------------------------------------------------------------------
 
 # Model architecture
-HIDDEN_DIMS = (256, 256, 128)   # hidden layer sizes
-DROPOUT = 0.1                   # dropout probability
+HIDDEN_DIMS = (1024, 512, 256)  # hidden layer sizes
+DROPOUT = 0.0                   # dropout probability
 
 # Optimization
-BATCH_SIZE = 64                 # mini-batch size
-LR = 1e-3                       # peak learning rate (AdamW)
-WEIGHT_DECAY = 1e-4             # L2 regularisation
-GRAD_CLIP = 1.0                 # gradient norm clip
-WARMUP_RATIO = 0.05             # fraction of time budget for LR warmup
+BATCH_SIZE = 512                # mini-batch size
+LR = 1.2e-3                     # peak learning rate (AdamW)
+WEIGHT_DECAY = 1e-5             # L2 regularisation
+GRAD_CLIP = 0.0                 # gradient norm clip (0 disables)
+WARMUP_RATIO = 0.1              # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.4            # fraction of time budget for LR warmdown
 FINAL_LR_FRAC = 0.01            # final LR as fraction of peak
+HUBER_BETA = 1.0                # SmoothL1 beta (targets are standardized)
 
 # ---------------------------------------------------------------------------
 # Setup: data, model, optimizer
@@ -105,9 +108,12 @@ y_train = train_df[LABEL_COLUMN].values.astype(np.float32)
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X_train)
 
+y_scaler = StandardScaler()
+y_scaled = y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
+
 dataset = TensorDataset(
     torch.tensor(X_scaled, dtype=torch.float32),
-    torch.tensor(y_train, dtype=torch.float32),
+    torch.tensor(y_scaled, dtype=torch.float32),
 )
 loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=False)
 
@@ -156,7 +162,7 @@ while True:
         model.train()
         optimizer.zero_grad(set_to_none=True)
         pred = model(x_batch)
-        loss = F.mse_loss(pred, y_batch)
+        loss = F.smooth_l1_loss(pred, y_batch, beta=HUBER_BETA)
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
         optimizer.step()
@@ -219,7 +225,7 @@ print()  # newline after \r training log
 # Final eval
 # ---------------------------------------------------------------------------
 
-wrapper = ModelWrapper(model, scaler, device)
+wrapper = ModelWrapper(model, scaler, y_scaler, device)
 mae, r2, rmse = evaluate_model(wrapper)
 
 t_end = time.time()
