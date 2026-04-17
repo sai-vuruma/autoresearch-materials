@@ -13,6 +13,7 @@ The repo is deliberately kept small and only really has three files that matter:
 - **`prepare.py`** — fixed constants, one-time data prep (downloads training data), and runtime utilities (dataloader, evaluation). Not modified.
 - **`train.py`** — the single file the agent edits. Contains the full model, optimizer, and training loop. Everything is fair game: architecture, hyperparameters, optimizer, batch size, etc. **This file is edited and iterated on by the agent**.
 - **`program.md`** — baseline instructions for one agent. Point your agent here and let it go. **This file is edited and iterated on by the human**.
+- `guidance.md` — human steering notes.
 
 By design, training runs for a **fixed 5-minute time budget** (wall clock, excluding startup/compilation), regardless of the details of your compute. The metric is **val_mae** (validation mean absolute error) — lower is better.
 
@@ -55,6 +56,7 @@ The `program.md` file is essentially a super lightweight "skill".
 prepare.py      — constants, data prep + runtime utilities (do not modify)
 train.py        — model, optimizer, training loop (agent modifies this)
 program.md      — agent instructions
+guidance.md     - human guidance, expectations
 pyproject.toml  — dependencies
 ```
 
