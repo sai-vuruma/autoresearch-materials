@@ -44,7 +44,7 @@ model = TransformedTargetRegressor(
                 "gp",
                 GaussianProcessRegressor(
                     kernel=kernel,
-                    alpha=1e-4,
+                    alpha=1e-3,
                     normalize_y=True,
                     n_restarts_optimizer=2,
                     random_state=42,
