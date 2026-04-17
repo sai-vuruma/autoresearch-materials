@@ -9,7 +9,7 @@ import time
 
 import pandas as pd
 from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
+from sklearn.gaussian_process.kernels import ConstantKernel, DotProduct, Matern, WhiteKernel
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.compose import TransformedTargetRegressor
@@ -32,7 +32,12 @@ print(f"Training samples: {len(X_train):,}")
 # A Matern kernel is a strong default for small OOD-prone tabular regression.
 kernel = (
     ConstantKernel(1.0, (1e-2, 1e3))
-    * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=2.5)
+    * Matern(
+        length_scale=[1.0] * X_train.shape[1],
+        length_scale_bounds=(1e-2, 1e3),
+        nu=2.5,
+    )
+    + DotProduct(sigma_0=1.0, sigma_0_bounds=(1e-3, 1e3))
     + WhiteKernel(noise_level=0.1, noise_level_bounds=(1e-5, 1e2))
 )
 
@@ -44,6 +49,7 @@ model = TransformedTargetRegressor(
                 "gp",
                 GaussianProcessRegressor(
                     kernel=kernel,
+                    alpha=1e-6,
                     normalize_y=True,
                     n_restarts_optimizer=5,
                     random_state=42,
