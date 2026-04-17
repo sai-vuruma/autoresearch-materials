@@ -21,6 +21,7 @@ Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact Gaussi
 - Training a supervised MLP encoder and fitting the GP on its learned latent features regressed badly to val_mae 14.918993 (`f236159`).
 - An age-binned REx MLP, a GP with age-bin indicator features, ExtraTrees, k-NN, kernel ridge, SVR, and shallow Huber boosting all regressed materially (`f3dc612`, `94fd26a`, `1c6e542`, `96d7e47`, `3ff80b9`, `79b60da`, `1190213`).
 - A Yeo-Johnson transform on the inputs regressed badly even though the same transform on the target helped (`895c49b`).
+- Within target-side transforms, `log1p` and quantile-normalized Gaussian targets were bad regressions, while Box-Cox was close but still worse than Yeo-Johnson (`993f4ea`, `eda7bc5`, `d988118`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
@@ -32,11 +33,12 @@ Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact Gaussi
 - Stagnation note: there are now 10 consecutive discarded experiments since `61fcde9`. The exhausted space includes GP hyperparameter neighborhood tuning, simple reweighting, shallow ensembling, learned-latent GP, REx-style MLP, and environment-indicator feature augmentation. The bottleneck looks structural rather than a missed local GP setting.
 - The broader non-GP search also looks poor so far: tree ensembles, neighbor methods, and other kernel machines have all been substantially worse than the best GP.
 - Target geometry matters more than input geometry here: transforming `y` helped the GP while transforming `X` hurt it.
+- Among target transforms, Yeo-Johnson appears to be the robust choice: more aggressive alternatives either regressed sharply or only matched part of the improvement profile.
 
 ## Unexplored directions
 - Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
 - Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the environment-partition direction fails.
 - Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
-- Try other target transforms or target-side robustification around the new best, since Yeo-Johnson finally broke the plateau.
+- Try target-side robustification around the new best only if it is genuinely different from Yeo-Johnson/Box-Cox/log1p/quantile normalization.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
 - Try remaining cheap structural baselines only if they are genuinely distinct: random forests, Bayesian linear models, or locally weighted regressors.
