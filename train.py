@@ -33,7 +33,7 @@ print(f"Training samples: {len(X_train):,}")
 kernel = (
     ConstantKernel(1.0, (1e-2, 1e3))
     * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=2.5)
-    + WhiteKernel(noise_level=0.1, noise_level_bounds=(1e-5, 1e2))
+    + WhiteKernel(noise_level=0.3, noise_level_bounds=(1e-3, 1e2))
 )
 
 model = TransformedTargetRegressor(
@@ -44,8 +44,9 @@ model = TransformedTargetRegressor(
                 "gp",
                 GaussianProcessRegressor(
                     kernel=kernel,
+                    alpha=1e-4,
                     normalize_y=True,
-                    n_restarts_optimizer=5,
+                    n_restarts_optimizer=2,
                     random_state=42,
                 ),
             ),
