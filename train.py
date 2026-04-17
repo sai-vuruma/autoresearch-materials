@@ -33,7 +33,7 @@ print(f"Training samples: {len(X_train):,}")
 kernel = (
     ConstantKernel(1.0, (1e-2, 1e3))
     * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=1.5)
-    + WhiteKernel(noise_level=0.3, noise_level_bounds=(1e-3, 1e2))
+    + WhiteKernel(noise_level=1.0, noise_level_bounds=(1e-3, 1e2))
 )
 
 model = TransformedTargetRegressor(
