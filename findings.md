@@ -13,16 +13,21 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - Replacing the Matern prior with RationalQuadratic regressed to val_mae 10.562639 (`1e4ab26`).
 - Making the kernel even rougher (`nu=0.5`) collapsed performance to val_mae 12.364519 (`95a668c`).
 - Increasing explicit GP jitter from `1e-4` to `1e-3` produced no measurable gain over the current best (`5e957d3`).
+- JTT-style residual reweighting with a second GP fit regressed to val_mae 10.243857 (`f7a0cb4`).
+- Increasing GP restart count from 2 to 8 only made the fit slower without improving val_mae (`2640e19`).
+- Lowering white-noise initialization from `0.3` to `0.1` also tied the incumbent (`5d23fde`).
+- A simple GP-plus-ridge ensemble regressed badly to val_mae 12.876797 (`6599c50`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
 - OOD-oriented guidance can be followed in a lightweight way here through robust kernel methods before adding more complex neural invariance machinery.
 - The current best model is simple for a reason: extra kernel flexibility hurt generalization, while modest regularization plus a rougher single Matern kernel improved it.
 - The local optimum seems fairly narrow: `nu=1.5` helps, but both smoother (`2.5`) and much rougher (`0.5`) priors are worse.
+- The current input-space GP is in a local plateau: recent changes to restarts, weighting, normalization, and shallow ensembling all failed to improve `61fcde9`.
 
 ## Unexplored directions
-- Try other simple Matern smoothness settings around the new best (`nu=1.5`) to see whether the optimum is broad or narrow.
+- Try a Bayesian last-layer variant: learn a compact supervised MLP encoder, then fit the GP on latent features instead of raw inputs.
+- Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the latent-GP direction fails.
 - Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
-- Try varying restart count or GP-side normalization choices around the best state without changing the learned kernel family.
 - Try robust target transforms such as log1p if label distribution is skewed.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
