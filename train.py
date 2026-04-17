@@ -77,14 +77,14 @@ class ModelWrapper:
 # ---------------------------------------------------------------------------
 
 # Model architecture
-HIDDEN_DIMS = (512, 512, 256)   # hidden layer sizes
+HIDDEN_DIMS = (1024, 512, 256)  # hidden layer sizes
 DROPOUT = 0.0                   # dropout probability
 
 # Optimization
 BATCH_SIZE = 512                # mini-batch size
 LR = 1.2e-3                     # peak learning rate (AdamW)
 WEIGHT_DECAY = 1e-5             # L2 regularisation
-GRAD_CLIP = 1.0                 # gradient norm clip
+GRAD_CLIP = 0.0                 # gradient norm clip (0 disables)
 WARMUP_RATIO = 0.1              # fraction of time budget for LR warmup
 WARMDOWN_RATIO = 0.4            # fraction of time budget for LR warmdown
 FINAL_LR_FRAC = 0.01            # final LR as fraction of peak
