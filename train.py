@@ -32,7 +32,7 @@ print(f"Training samples: {len(X_train):,}")
 # A Matern kernel is a strong default for small OOD-prone tabular regression.
 kernel = (
     ConstantKernel(1.0, (1e-2, 1e3))
-    * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=2.5)
+    * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=1.5)
     + WhiteKernel(noise_level=0.3, noise_level_bounds=(1e-3, 1e2))
 )
 
