@@ -1,12 +1,13 @@
 ## Current best
-val_mae: 9.662166 (iter 4, commit 61fcde9)
-Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor, kernel = Constant * Matern(nu=1.5) + WhiteKernel, `alpha=1e-4`, white noise init `0.3`, 2 optimizer restarts.
+val_mae: 9.627625 (iter 23, commit e4a39af)
+Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact GaussianProcessRegressor, kernel = Constant * Matern(nu=1.5) + WhiteKernel, `alpha=1e-4`, white noise init `0.3`, 2 optimizer restarts.
 
 ## What works
 - Replacing the neural baseline with an exact GP is a large win on this small tabular dataset: val_mae improved from 32.208550 to 9.921234 (baseline `1988f07` -> iter 1 `32f95e4`).
 - Simpler non-neural structure is appropriate here because the current environment is CPU-only and the previous MLP stopped after 100 epochs while barely using the 300s budget (`1988f07`).
 - Slightly stronger GP regularization preserved accuracy while reducing fit time: `alpha=1e-4`, higher white-noise init, and 2 restarts matched/slightly beat the earlier best (`f502724`).
 - A rougher Matern prior helped materially: changing from `nu=2.5` to `nu=1.5` improved val_mae from 9.921232 to 9.662166 on the regularized GP (`f502724` -> `61fcde9`).
+- A Yeo-Johnson transform on the target improved the GP again after a long structural plateau: val_mae moved from 9.662166 to 9.627625 (`61fcde9` -> `e4a39af`).
 
 ## What doesn't work
 - The original MLP baseline is badly underfit in this environment and is not competitive for this dataset (`1988f07`).
@@ -19,6 +20,7 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - A simple GP-plus-ridge ensemble regressed badly to val_mae 12.876797 (`6599c50`).
 - Training a supervised MLP encoder and fitting the GP on its learned latent features regressed badly to val_mae 14.918993 (`f236159`).
 - An age-binned REx MLP, a GP with age-bin indicator features, ExtraTrees, k-NN, kernel ridge, SVR, and shallow Huber boosting all regressed materially (`f3dc612`, `94fd26a`, `1c6e542`, `96d7e47`, `3ff80b9`, `79b60da`, `1190213`).
+- A Yeo-Johnson transform on the inputs regressed badly even though the same transform on the target helped (`895c49b`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
@@ -29,11 +31,12 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - A learned latent space did not help here: replacing raw standardized features with a small supervised MLP encoder made the downstream GP much worse, so lack of learned representation is not the obvious bottleneck.
 - Stagnation note: there are now 10 consecutive discarded experiments since `61fcde9`. The exhausted space includes GP hyperparameter neighborhood tuning, simple reweighting, shallow ensembling, learned-latent GP, REx-style MLP, and environment-indicator feature augmentation. The bottleneck looks structural rather than a missed local GP setting.
 - The broader non-GP search also looks poor so far: tree ensembles, neighbor methods, and other kernel machines have all been substantially worse than the best GP.
+- Target geometry matters more than input geometry here: transforming `y` helped the GP while transforming `X` hurt it.
 
 ## Unexplored directions
 - Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
 - Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the environment-partition direction fails.
 - Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
-- Try robust target transforms such as log1p if label distribution is skewed.
+- Try other target transforms or target-side robustification around the new best, since Yeo-Johnson finally broke the plateau.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
 - Try remaining cheap structural baselines only if they are genuinely distinct: random forests, Bayesian linear models, or locally weighted regressors.
