@@ -20,4 +20,5 @@ AGENTS.md
 dev/
 
 # Results file
-results.tsv
+*results.tsv
+run.log

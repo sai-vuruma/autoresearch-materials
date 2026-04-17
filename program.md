@@ -77,18 +77,20 @@ commit	val_mae  val_r2   val_rmse	memory_gb	status	description
 
 1. git commit hash (short, 7 chars)
 2. val_mae achieved (e.g. 1.234567) — use 0.000000 for crashes
-3. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
-4. status: `keep`, `discard`, or `crash`
-5. short text description of what this experiment tried
+3. val_r2 achieved (eg: 0.1234) - use 0.000000 for crashes
+4. val_rmase achieved (eg: 1.234567) - use 0.000000 for crashes
+5. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
+6. status: `keep`, `discard`, or `crash`
+7. short text description of what this experiment tried
 
 Example:
 
 ```
-commit	val_mae	memory_gb	status	description
-a1b2c3d	0.997900	44.0	keep	baseline
-b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
-c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
-d4e5f6g	0.000000	0.0	crash	double model width (OOM)
+commit	val_mae  val_r2   val_rmase memory_gb	status	description
+a1b2c3d	0.997900	0.1234   0.946734  44.0       keep	   baseline
+b2c3d4e	0.993200	-0.1234  0.923744  44.2       keep	   increase LR to 0.04
+c3d4e5f	1.005000	0.2345   0.783542  44.0       discard	switch to GeLU activation
+d4e5f6g	0.000000	0.0000   0.000000  0.0        crash    double model width (OOM)
 ```
 
 ## Knowledge management
