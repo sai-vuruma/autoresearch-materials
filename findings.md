@@ -17,6 +17,7 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - Increasing GP restart count from 2 to 8 only made the fit slower without improving val_mae (`2640e19`).
 - Lowering white-noise initialization from `0.3` to `0.1` also tied the incumbent (`5d23fde`).
 - A simple GP-plus-ridge ensemble regressed badly to val_mae 12.876797 (`6599c50`).
+- Training a supervised MLP encoder and fitting the GP on its learned latent features regressed badly to val_mae 14.918993 (`f236159`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
@@ -24,10 +25,11 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - The current best model is simple for a reason: extra kernel flexibility hurt generalization, while modest regularization plus a rougher single Matern kernel improved it.
 - The local optimum seems fairly narrow: `nu=1.5` helps, but both smoother (`2.5`) and much rougher (`0.5`) priors are worse.
 - The current input-space GP is in a local plateau: recent changes to restarts, weighting, normalization, and shallow ensembling all failed to improve `61fcde9`.
+- A learned latent space did not help here: replacing raw standardized features with a small supervised MLP encoder made the downstream GP much worse, so lack of learned representation is not the obvious bottleneck.
 
 ## Unexplored directions
-- Try a Bayesian last-layer variant: learn a compact supervised MLP encoder, then fit the GP on latent features instead of raw inputs.
-- Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the latent-GP direction fails.
+- Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
+- Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the environment-partition direction fails.
 - Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
 - Try robust target transforms such as log1p if label distribution is skewed.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
