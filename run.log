@@ -1,0 +1,20 @@
+/Users/sai-vuruma/Documents/mleg/ltc-pred/autoresearch-materials/.venv/lib/python3.10/site-packages/sklearn/gaussian_process/_gpr.py:444: RuntimeWarning: divide by zero encountered in matmul
+  y_mean = K_trans @ self.alpha_
+/Users/sai-vuruma/Documents/mleg/ltc-pred/autoresearch-materials/.venv/lib/python3.10/site-packages/sklearn/gaussian_process/_gpr.py:444: RuntimeWarning: overflow encountered in matmul
+  y_mean = K_trans @ self.alpha_
+/Users/sai-vuruma/Documents/mleg/ltc-pred/autoresearch-materials/.venv/lib/python3.10/site-packages/sklearn/gaussian_process/_gpr.py:444: RuntimeWarning: invalid value encountered in matmul
+  y_mean = K_trans @ self.alpha_
+Device: cpu
+Model: GaussianProcessRegressor
+Time budget:      300s
+Training samples: 800
+---
+val_mae:          12.364519
+val_r2:           -1.894533
+val_rmse:         14.855087
+training_seconds: 1.7
+total_seconds:    1.7
+peak_vram_mb:     0.0
+num_steps:        1
+num_params:       3
+num_epochs:       1
