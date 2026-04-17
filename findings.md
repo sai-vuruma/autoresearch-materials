@@ -1,6 +1,6 @@
 ## Current best
-val_mae: 9.627625 (iter 23, commit e4a39af)
-Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact GaussianProcessRegressor, kernel = Constant * Matern(nu=1.5) + WhiteKernel, `alpha=1e-4`, white noise init `0.3`, 2 optimizer restarts.
+val_mae: 9.627624 (iter 28, commit e6d1a84)
+Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact GaussianProcessRegressor, kernel = Constant * Matern(nu=1.5) + WhiteKernel, `alpha=1e-4`, white noise init `1.0`, 2 optimizer restarts.
 
 ## What works
 - Replacing the neural baseline with an exact GP is a large win on this small tabular dataset: val_mae improved from 32.208550 to 9.921234 (baseline `1988f07` -> iter 1 `32f95e4`).
@@ -8,6 +8,7 @@ Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact Gaussi
 - Slightly stronger GP regularization preserved accuracy while reducing fit time: `alpha=1e-4`, higher white-noise init, and 2 restarts matched/slightly beat the earlier best (`f502724`).
 - A rougher Matern prior helped materially: changing from `nu=2.5` to `nu=1.5` improved val_mae from 9.921232 to 9.662166 on the regularized GP (`f502724` -> `61fcde9`).
 - A Yeo-Johnson transform on the target improved the GP again after a long structural plateau: val_mae moved from 9.662166 to 9.627625 (`61fcde9` -> `e4a39af`).
+- Raising the GP white-noise initialization from `0.3` to `1.0` after the Yeo-Johnson target transform produced another small win: 9.627625 -> 9.627624 (`e4a39af` -> `e6d1a84`).
 
 ## What doesn't work
 - The original MLP baseline is badly underfit in this environment and is not competitive for this dataset (`1988f07`).
@@ -22,6 +23,8 @@ Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact Gaussi
 - An age-binned REx MLP, a GP with age-bin indicator features, ExtraTrees, k-NN, kernel ridge, SVR, and shallow Huber boosting all regressed materially (`f3dc612`, `94fd26a`, `1c6e542`, `96d7e47`, `3ff80b9`, `79b60da`, `1190213`).
 - A Yeo-Johnson transform on the inputs regressed badly even though the same transform on the target helped (`895c49b`).
 - Within target-side transforms, `log1p` and quantile-normalized Gaussian targets were bad regressions, while Box-Cox was close but still worse than Yeo-Johnson (`993f4ea`, `eda7bc5`, `d988118`).
+- After the target-transform win, more restarts, a smoother Matern kernel, and higher white-noise init all failed to improve the new basin (`8e94fcb`, `db21aa0`, `404c4fb`).
+- GP hybrids did not improve MAE: averaging transformed and raw-target GPs or nearby transformed GPs tended to help RMSE slightly but lost on the primary metric (`8645254`, `3f597a7`, `e23a952`, `db1658d`, `9c85fe0`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
@@ -34,11 +37,12 @@ Key config: StandardScaler on inputs, Yeo-Johnson target transform, exact Gaussi
 - The broader non-GP search also looks poor so far: tree ensembles, neighbor methods, and other kernel machines have all been substantially worse than the best GP.
 - Target geometry matters more than input geometry here: transforming `y` helped the GP while transforming `X` hurt it.
 - Among target transforms, Yeo-Johnson appears to be the robust choice: more aggressive alternatives either regressed sharply or only matched part of the improvement profile.
+- Hybridization is not obviously worth the extra complexity here: nearby GP ensembles can trade a bit of RMSE for worse MAE, but the single best GP remains the cleanest incumbent.
 
 ## Unexplored directions
 - Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
-- Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if the environment-partition direction fails.
-- Try larger jitter/noise floor only if it keeps the same simple kernel and materially improves stability.
+- Try other simple Matern smoothness settings around the new best (`nu=1.5`) only if a genuinely new idea justifies revisiting them.
+- Try larger jitter/noise floor only if it differs more fundamentally from the already-tested `0.3`, `1.0`, and `3.0` basin.
 - Try target-side robustification around the new best only if it is genuinely different from Yeo-Johnson/Box-Cox/log1p/quantile normalization.
 - Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
-- Try remaining cheap structural baselines only if they are genuinely distinct: random forests, Bayesian linear models, or locally weighted regressors.
+- Try remaining hybrid ideas only if they are asymmetric or conditional enough to materially differ from the tested simple averages.
