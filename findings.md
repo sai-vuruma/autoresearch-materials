@@ -26,6 +26,7 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 - The local optimum seems fairly narrow: `nu=1.5` helps, but both smoother (`2.5`) and much rougher (`0.5`) priors are worse.
 - The current input-space GP is in a local plateau: recent changes to restarts, weighting, normalization, and shallow ensembling all failed to improve `61fcde9`.
 - A learned latent space did not help here: replacing raw standardized features with a small supervised MLP encoder made the downstream GP much worse, so lack of learned representation is not the obvious bottleneck.
+- Stagnation note: there are now 10 consecutive discarded experiments since `61fcde9`. The exhausted space includes GP hyperparameter neighborhood tuning, simple reweighting, shallow ensembling, learned-latent GP, REx-style MLP, and environment-indicator feature augmentation. The bottleneck looks structural rather than a missed local GP setting.
 
 ## Unexplored directions
 - Try a more OOD-specific structural change such as hand-crafted environment partitions with Group DRO/REx, instead of more GP neighborhood tuning.
