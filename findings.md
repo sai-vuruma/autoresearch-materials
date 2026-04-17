@@ -8,12 +8,17 @@ Key config: StandardScaler on inputs and target, exact GaussianProcessRegressor,
 
 ## What doesn't work
 - The original MLP baseline is badly underfit in this environment and is not competitive for this dataset (`fa257c9`).
+- Adding a linear kernel term plus ARD length scales made the GP both slower and worse: val_mae 14.293646 with a 31.7s fit (`90cd75e`).
+- A `log1p` target transform degraded the simple GP baseline to val_mae 12.923762 (`73c40f3`).
+- A robust `HistGradientBoostingRegressor` baseline was substantially worse than the GP at val_mae 16.985010 (`82f33ff`).
 
 ## Structural findings
 - For 800 training rows and 8 numeric features, exact kernel regression is a better starting point than a moderately sized deep MLP.
 - OOD-oriented guidance can be followed in a lightweight way here through robust kernel methods before adding more complex neural invariance machinery.
+- The current best model is simple for a reason: extra kernel flexibility and tree boosting both reduced generalization, so the next gains likely need better regularized kernel structure rather than more capacity.
 
 ## Unexplored directions
 - Tune the GP kernel family: RationalQuadratic, additive linear + Matern, ARD length scales, larger jitter/noise floor.
-- Try robust target transforms such as log1p if label distribution is skewed.
-- Try a hard-example reweighting/JTT-style second pass only if kernel tuning plateaus.
+- Try larger jitter/noise floor or fewer optimizer restarts to address the recurrent GP numerical warnings without changing the inductive bias.
+- Try RationalQuadratic or a different smoothness choice while keeping the single-kernel structure simple.
+- Try a hard-example reweighting/JTT-style second pass only if simple kernel tuning plateaus.
