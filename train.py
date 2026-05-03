@@ -60,7 +60,7 @@ class WeightedConformalShiftRegressor:
         train_df = X.copy()
         train_df[LABEL_COLUMN] = y.to_numpy()
 
-        calib_size = max(120, int(0.2 * len(train_df)))
+        calib_size = int(0.3 * len(train_df))
         fit_df = train_df.iloc[:-calib_size].reset_index(drop=True)
         calib_df = train_df.iloc[-calib_size:].reset_index(drop=True)
 
