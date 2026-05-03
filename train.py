@@ -18,7 +18,7 @@ from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
 class NAM(nn.Module):
-    def __init__(self, in_dim, hidden=64):
+    def __init__(self, in_dim, hidden=80):
         super().__init__()
         self.feature_nets = nn.ModuleList(
             [
