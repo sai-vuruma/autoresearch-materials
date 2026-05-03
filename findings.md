@@ -26,14 +26,17 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Averaging bias estimates across top 15/20/25% holdouts was worse than the single top-20 holdout: val_mae 7.532951.
 - TabPFN could not run without noninteractive license token/model access.
 - Extrapolation mixup MLP with tilted underprediction loss was much worse: val_mae 17.395464.
+- Non-GP guidance attempts so far are below the GP/HGB best: quantile HGB val_mae 14.784369, anchor-point HGB 15.864447, NAM 8.677804.
+- Monotonic-family tuning is active per human guidance. Pure positive-weight monotonic MLP was very poor (21.067557); partial monotonic with free path improved but still poor (17.404421); soft gradient-penalty monotonic MLP is best in family so far (11.782069 with penalty 0.2). Reducing penalty to 0.05 worsened to 12.623925.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
 - The target power transform is beneficial or at least not removable for this current GP.
 - The baseline GP underpredicts high-y OOD regions. A constant bias correction learned from top-y train holdout is robust; slope/intercept correction is too aggressive.
 - HistGradientBoosting alone underpredicts high-y holdout more than GP on train-only diagnostics, but a small blend improves the final biased GP, likely adding local shape while GP+bias handles extrapolation.
+- Hard monotonic architectures appear too restrictive for this dataset; soft monotonic regularization preserves more capacity and is the current monotonic direction to tune.
 
 ## Unexplored directions
-- Per human guidance, pause GP-specific improvement and try other guidance approaches: asymmetric/quantile regression, monotonic/NAM-style neural models, anchor points, NALU, or PySR residuals.
+- Continue fine-tuning the current monotonic approach for 10-15 total experiments before switching, unless stagnation/crashes make it unproductive.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
 - Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
