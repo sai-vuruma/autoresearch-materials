@@ -1,9 +1,10 @@
 """
 Autoresearch training script.
-Delta Ridge MLP on the Concrete dataset.
+Test-time-training MLP with masked feature reconstruction.
 Usage: uv run train.py
 """
 
+import copy
 import os
 import time
 
@@ -12,35 +13,52 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class ResidualMLP(nn.Module):
-    def __init__(self, in_dim, hidden=64):
+class TTTNet(nn.Module):
+    def __init__(self, in_dim, hidden=64, latent=32):
         super().__init__()
-        self.net = nn.Sequential(
+        self.encoder = nn.Sequential(
             nn.Linear(in_dim, hidden),
             nn.SiLU(),
-            nn.Linear(hidden, hidden),
+            nn.Linear(hidden, latent),
             nn.SiLU(),
-            nn.Linear(hidden, 32),
+        )
+        self.reg_head = nn.Linear(latent, 1)
+        self.ssl_head = nn.Sequential(
+            nn.Linear(latent, hidden),
             nn.SiLU(),
-            nn.Linear(32, 1),
+            nn.Linear(hidden, in_dim),
         )
 
-    def forward(self, x):
-        return self.net(x).squeeze(-1)
+    def encode(self, x):
+        return self.encoder(x)
+
+    def predict_y(self, x):
+        return self.reg_head(self.encode(x)).squeeze(-1)
+
+    def reconstruct_x(self, x):
+        return self.ssl_head(self.encode(x))
 
 
-class DeltaRidgeMLPRegressor:
-    def __init__(self, random_state=42):
+class TTTMLPRegressor:
+    def __init__(self, random_state=42, ssl_weight=0.5, mask_prob=0.3, adapt_steps=50):
         self.random_state = random_state
-        self.residual_scale = 1.0
+        self.ssl_weight = ssl_weight
+        self.mask_prob = mask_prob
+        self.adapt_steps = adapt_steps
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
+
+    def _masked_reconstruction_loss(self, x):
+        mask = (torch.rand_like(x) < self.mask_prob).float()
+        masked_x = x * (1.0 - mask)
+        recon = self.model_.reconstruct_x(masked_x)
+        denom = mask.sum().clamp_min(1.0)
+        return (((recon - x) * mask).pow(2).sum() / denom)
 
     def fit(self, X, y):
         torch.manual_seed(self.random_state)
@@ -50,22 +68,21 @@ class DeltaRidgeMLPRegressor:
         y_np = self.y_scaler_.fit_transform(np.asarray(y).reshape(-1, 1)).ravel().astype(
             np.float32
         )
-        self.ridge_ = RidgeCV(alphas=np.logspace(-4, 4, 17)).fit(x_np, y_np)
-        base_np = self.ridge_.predict(x_np).astype(np.float32)
-        residual_np = y_np - base_np
-
         x = torch.from_numpy(x_np)
-        residual_t = torch.from_numpy(residual_np)
-        self.model_ = ResidualMLP(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=5e-4, weight_decay=1e-4)
+        y_t = torch.from_numpy(y_np)
+        self.model_ = TTTNet(x.shape[1])
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
 
         while time.time() < deadline and step < 25000:
             idx = torch.randint(0, len(x), (batch_size,))
-            pred = self.model_(x[idx])
-            loss = F.smooth_l1_loss(pred, residual_t[idx], beta=0.25)
+            xb = x[idx]
+            pred = self.model_.predict_y(xb)
+            reg_loss = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
+            ssl_loss = self._masked_reconstruction_loss(xb)
+            loss = reg_loss + self.ssl_weight * ssl_loss
 
             optimizer.zero_grad()
             loss.backward()
@@ -77,12 +94,38 @@ class DeltaRidgeMLPRegressor:
         self.model_.eval()
         return self
 
+    def _adapt(self, x):
+        encoder_state = copy.deepcopy(self.model_.encoder.state_dict())
+        ssl_state = copy.deepcopy(self.model_.ssl_head.state_dict())
+        self.model_.encoder.train()
+        self.model_.ssl_head.train()
+        self.model_.reg_head.eval()
+        optimizer = torch.optim.AdamW(
+            list(self.model_.encoder.parameters()) + list(self.model_.ssl_head.parameters()),
+            lr=1e-4,
+            weight_decay=0.0,
+        )
+        for _ in range(self.adapt_steps):
+            loss = self._masked_reconstruction_loss(x)
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                list(self.model_.encoder.parameters()) + list(self.model_.ssl_head.parameters()),
+                2.0,
+            )
+            optimizer.step()
+        self.model_.eval()
+        return encoder_state, ssl_state
+
     def predict(self, X):
         x_np = self.x_scaler_.transform(X).astype(np.float32)
-        base = self.ridge_.predict(x_np)
+        x = torch.from_numpy(x_np)
+        encoder_state, ssl_state = self._adapt(x)
         with torch.no_grad():
-            residual = self.model_(torch.from_numpy(x_np)).numpy()
-        pred = base + self.residual_scale * residual
+            pred = self.model_.predict_y(x).numpy()
+        self.model_.encoder.load_state_dict(encoder_state)
+        self.model_.ssl_head.load_state_dict(ssl_state)
+        self.model_.eval()
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
@@ -93,11 +136,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: DeltaRidgeMLPRegressor")
+print("Model: TTTMLPRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = DeltaRidgeMLPRegressor()
+model = TTTMLPRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
