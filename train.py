@@ -61,7 +61,7 @@ class NAMRegressor:
         y_t = torch.from_numpy(y_np)
 
         self.model_ = NAM(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=2e-3, weight_decay=2e-4)
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=2e-4)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
