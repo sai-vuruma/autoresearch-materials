@@ -64,7 +64,7 @@ class DeltaRidgeMLPRegressor:
         while time.time() < deadline and step < 25000:
             idx = torch.randint(0, len(x), (batch_size,))
             pred = self.model_(x[idx])
-            loss = F.smooth_l1_loss(pred, residual_t[idx], beta=0.1)
+            loss = F.mse_loss(pred, residual_t[idx])
 
             optimizer.zero_grad()
             loss.backward()
