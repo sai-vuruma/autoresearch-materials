@@ -18,7 +18,7 @@ from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
 class MLP(nn.Module):
-    def __init__(self, in_dim, hidden=128):
+    def __init__(self, in_dim, hidden=64):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden),
@@ -35,7 +35,7 @@ class MLP(nn.Module):
 
 
 class RExMLPRegressor:
-    def __init__(self, random_state=42, rex_lambda=0.5, n_envs=2):
+    def __init__(self, random_state=42, rex_lambda=1.0, n_envs=2):
         self.random_state = random_state
         self.rex_lambda = rex_lambda
         self.n_envs = n_envs
