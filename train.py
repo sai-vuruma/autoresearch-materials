@@ -35,7 +35,7 @@ class MLP(nn.Module):
 
 
 class JTTMLPRegressor:
-    def __init__(self, random_state=42, hard_frac=0.2, hard_weight=5.0):
+    def __init__(self, random_state=42, hard_frac=0.2, hard_weight=2.0):
         self.random_state = random_state
         self.hard_frac = hard_frac
         self.hard_weight = hard_weight
