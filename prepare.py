@@ -37,26 +37,10 @@ DATA_DIR = os.path.join(CACHE_DIR, "data")
 # ---------------------------------------------------------------------------
 
 def download_data():
-    """Download training shards + pinned validation shard."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-    
-    dataset = fetch_ucirepo(id=165)
-    print(f"Data: downloaded {dataset.name} dataset")
-    print("Metadata: ", dataset.metadata)
-    print("Variables: ", dataset.variables)
-
-    X = dataset.data.features
-    y = dataset.data.targets
-    data = pd.concat([X, y], axis=1)
-    data = data.sort_values(by=LABEL_COLUMN).reset_index(drop=True)
-
-    train_data = data[:800]
-    test_data = data[800:]
-    train_data.to_csv(os.path.join(DATA_DIR, "train.csv"), index=False)
-    test_data.to_csv(os.path.join(DATA_DIR, "test.csv"), index=False)
-    print(f"Data: split into train and test datasets, shape: {train_data.shape}, {test_data.shape}")
-    print(f"Data: saved to {os.path.join(DATA_DIR, 'train.csv')} and {os.path.join(DATA_DIR, 'test.csv')}")
-
+    """
+    Download the data from the UCI repository.
+    Split into train and test datasets.
+    """
 
 # ---------------------------------------------------------------------------
 # Evaluation

@@ -123,7 +123,7 @@ Key config: depth=N, dim=N, batch=N, LR=X, ...
 
 Commit `findings.md` to the branch alongside successful experiments. This file is your institutional memory — without it, the next session will waste GPU time re-discovering what you already know.
 
-### `guidance.md` — human steering (optional, read-only for you)
+### `guidance.md` — human steering (read-only for you)
 
 If this file exists, read it before planning each experiment. It contains directions from the human operator:
 - Research goals or priorities
