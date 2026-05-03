@@ -9,6 +9,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Multiplier tuning found 1.445x best so far: 1.45x was close at val_mae 7.525804, 1.5x 7.530105, 1.55x 7.538147, 1.75x 7.656927, 1.4x 7.531981, 1.43x 7.526523, 1.47x 7.526719.
 - A small HistGradientBoosting blend with the bias-shifted GP improved substantially: 90% GP / 10% HistGradientBoosting reached val_mae 6.987598.
 - Increasing the HistGradientBoosting weight kept helping up to 50%: 20% HGB val_mae 6.498735, 30% HGB 6.123640, 50% HGB 5.809324.
+- Circle-back on GP-HGB blend found 55% HGB best in that local sweep at val_mae 5.777955; 60% was 5.784802, 52.5% was 5.792492, and 70% was 5.918737. Still below current NAM best.
 
 ## What doesn't work
 - DotProduct + RBF kernel replacing the baseline Matern kernel regressed badly: val_mae 13.050588.
