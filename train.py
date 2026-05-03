@@ -38,6 +38,7 @@ class ResidualMLP(nn.Module):
 class DeltaRidgeMLPRegressor:
     def __init__(self, random_state=42):
         self.random_state = random_state
+        self.residual_scale = 0.5
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
@@ -64,7 +65,7 @@ class DeltaRidgeMLPRegressor:
         while time.time() < deadline and step < 25000:
             idx = torch.randint(0, len(x), (batch_size,))
             pred = self.model_(x[idx])
-            loss = F.mse_loss(pred, residual_t[idx])
+            loss = F.smooth_l1_loss(pred, residual_t[idx], beta=0.25)
 
             optimizer.zero_grad()
             loss.backward()
@@ -81,7 +82,7 @@ class DeltaRidgeMLPRegressor:
         base = self.ridge_.predict(x_np)
         with torch.no_grad():
             residual = self.model_(torch.from_numpy(x_np)).numpy()
-        pred = base + residual
+        pred = base + self.residual_scale * residual
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
