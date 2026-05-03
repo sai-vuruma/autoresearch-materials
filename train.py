@@ -70,7 +70,7 @@ class NAMRegressor:
             idx = torch.randint(0, len(x), (batch_size,))
             pred = self.model_(x[idx])
             huber = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
-            loss = huber + 7.5 * self._tilted_loss(pred, y_t[idx])
+            loss = huber + 10.0 * self._tilted_loss(pred, y_t[idx])
 
             optimizer.zero_grad()
             loss.backward()
