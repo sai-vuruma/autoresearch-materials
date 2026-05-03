@@ -73,8 +73,8 @@ class JTTMLPRegressor:
         base_weights = torch.ones(len(x))
 
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
-        warmup_steps = 2000
-        train_steps = 23000
+        warmup_steps = 1000
+        train_steps = 24000
         self.warm_model_ = self._train_model(x, y_t, base_weights, warmup_steps)
 
         with torch.no_grad():
