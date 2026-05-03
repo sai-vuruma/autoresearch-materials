@@ -1,6 +1,6 @@
 """
 Autoresearch training script.
-Just Train Twice (JTT) hard-sample reweighted MLP.
+Neural Additive Model on the Concrete dataset.
 Usage: uv run train.py
 """
 
@@ -17,48 +17,37 @@ from sklearn.preprocessing import StandardScaler
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class MLP(nn.Module):
+class NAM(nn.Module):
     def __init__(self, in_dim, hidden=64):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, hidden),
-            nn.SiLU(),
-            nn.Linear(hidden, 32),
-            nn.SiLU(),
-            nn.Linear(32, 1),
+        self.feature_nets = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(1, hidden),
+                    nn.SiLU(),
+                    nn.Linear(hidden, hidden),
+                    nn.SiLU(),
+                    nn.Linear(hidden, 1),
+                )
+                for _ in range(in_dim)
+            ]
         )
+        self.bias = nn.Parameter(torch.zeros(()))
 
     def forward(self, x):
-        return self.net(x).squeeze(-1)
+        terms = [net(x[:, i : i + 1]).squeeze(-1) for i, net in enumerate(self.feature_nets)]
+        return torch.stack(terms, dim=0).sum(dim=0) + self.bias
 
 
-class JTTMLPRegressor:
-    def __init__(self, random_state=42, hard_frac=0.2, hard_weight=2.0):
+class NAMRegressor:
+    def __init__(self, random_state=42):
         self.random_state = random_state
-        self.hard_frac = hard_frac
-        self.hard_weight = hard_weight
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
-    def _train_model(self, x, y_t, weights, steps, lr=1e-3):
-        model = MLP(x.shape[1])
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
-        batch_size = 128
-        step = 0
-        while step < steps:
-            idx = torch.randint(0, len(x), (batch_size,))
-            pred = model(x[idx])
-            per_sample = F.smooth_l1_loss(pred, y_t[idx], beta=0.5, reduction="none")
-            loss = (per_sample * weights[idx]).mean()
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
-            optimizer.step()
-            step += 1
-        model.eval()
-        return model
+    def _tilted_loss(self, pred, target, tau=0.75):
+        err = target - pred
+        return torch.maximum(tau * err, (tau - 1.0) * err).mean()
 
     def fit(self, X, y):
         torch.manual_seed(self.random_state)
@@ -70,23 +59,27 @@ class JTTMLPRegressor:
         )
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
-        base_weights = torch.ones(len(x))
 
+        self.model_ = NAM(x.shape[1])
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=2e-3, weight_decay=2e-4)
+        batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
-        warmup_steps = 2000
-        train_steps = 23000
-        self.warm_model_ = self._train_model(x, y_t, base_weights, warmup_steps)
+        step = 0
 
-        with torch.no_grad():
-            losses = F.smooth_l1_loss(self.warm_model_(x), y_t, beta=0.5, reduction="none")
-        threshold = torch.quantile(losses, 1.0 - self.hard_frac)
-        weights = torch.ones(len(x))
-        weights[losses >= threshold] = self.hard_weight
-        weights = weights / weights.mean()
+        while time.time() < deadline and step < 25000:
+            idx = torch.randint(0, len(x), (batch_size,))
+            pred = self.model_(x[idx])
+            huber = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
+            loss = huber + 0.15 * self._tilted_loss(pred, y_t[idx])
 
-        remaining = max(1000, min(train_steps, int((deadline - time.time()) * 1000)))
-        self.model_ = self._train_model(x, y_t, weights, remaining)
-        self.num_steps_ = warmup_steps + remaining
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model_.parameters(), 2.0)
+            optimizer.step()
+            step += 1
+
+        self.num_steps_ = step
+        self.model_.eval()
         return self
 
     def predict(self, X):
@@ -103,11 +96,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: JTTMLPRegressor")
+print("Model: NAMRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = JTTMLPRegressor()
+model = NAMRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
