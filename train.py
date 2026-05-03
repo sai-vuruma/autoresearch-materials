@@ -58,7 +58,7 @@ class GatedExtrapMLPRegressor:
             np.einsum("ij,jk,ik->i", x_np - self.mu_, self.cov_inv_, x_np - self.mu_)
         )
         self.gate_center_ = float(np.quantile(train_mahal, 0.99))
-        self.gate_temp_ = 0.75
+        self.gate_temp_ = 1.5
 
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
