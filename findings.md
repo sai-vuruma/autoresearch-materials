@@ -29,6 +29,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Non-GP guidance attempts so far are below the GP/HGB best: quantile HGB val_mae 14.784369, anchor-point HGB 15.864447, NAM 8.677804.
 - Monotonic-family tuning is active per human guidance. Pure positive-weight monotonic MLP was very poor (21.067557); partial monotonic with free path improved but still poor (17.404421); soft gradient-penalty monotonic MLP is best in family so far (11.782069 with penalty 0.2). Reducing penalty to 0.05 worsened to 12.623925.
 - Monotonic stagnation: 10 monotonic-family experiments all failed to approach the current best. Stronger penalty 0.5 worsened to 14.259600; feature masks at abs-corr >=0.4 and >=0.15 worsened to 12.826622 and 13.303174; longer training worsened to 12.306579; LR 3e-3 and 7.5e-4 worsened to 13.789898 and 14.383346.
+- NALU stagnation after 10 experiments: baseline hidden-32 NALU val_mae 12.687710; hidden 64 12.673314; log-input skip improved to 10.218379; hidden 32/128 with skip regressed; raw-input skip slightly improved to 10.092560; longer training, LR 5e-4/2e-3, and MSE loss regressed; tilted loss was best NALU at 8.393496 but still far below NAM/GP-HGB.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -36,8 +37,9 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - The baseline GP underpredicts high-y OOD regions. A constant bias correction learned from top-y train holdout is robust; slope/intercept correction is too aggressive.
 - HistGradientBoosting alone underpredicts high-y holdout more than GP on train-only diagnostics, but a small blend improves the final biased GP, likely adding local shape while GP+bias handles extrapolation.
 - Hard monotonic architectures appear too restrictive for this dataset; soft monotonic regularization preserves more capacity and is the current monotonic direction to tune.
+- NALU arithmetic units are not a good fit here. The only useful ingredient was a simple linear skip path; the arithmetic stack itself did not close the gap.
 
 ## Unexplored directions
-- Switch away from monotonic after stagnation. Next best non-GP direction is NAM-style models (best non-GP so far val_mae 8.677804) and tune for a sustained run before switching again.
+- Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
 - Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
