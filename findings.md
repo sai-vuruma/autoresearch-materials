@@ -31,6 +31,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Monotonic stagnation: 10 monotonic-family experiments all failed to approach the current best. Stronger penalty 0.5 worsened to 14.259600; feature masks at abs-corr >=0.4 and >=0.15 worsened to 12.826622 and 13.303174; longer training worsened to 12.306579; LR 3e-3 and 7.5e-4 worsened to 13.789898 and 14.383346.
 - NALU stagnation after 10 experiments: baseline hidden-32 NALU val_mae 12.687710; hidden 64 12.673314; log-input skip improved to 10.218379; hidden 32/128 with skip regressed; raw-input skip slightly improved to 10.092560; longer training, LR 5e-4/2e-3, and MSE loss regressed; tilted loss was best NALU at 8.393496 but still far below NAM/GP-HGB.
 - EDL stagnation after 10 experiments: baseline evidential MLP val_mae 13.973953; lambda 0.001/0.1 worsened; extra gamma MSE worsened; tilted gamma loss helped slightly; smaller hidden sizes helped with hidden 32 best among standard EDL variants at 13.876219; hidden 16 worsened; LR 2e-3 worsened; hidden 32 with LR 5e-4 was best EDL at 12.283950 but still far below current best.
+- SNGP/Lipschitz stagnation after 10 experiments: baseline spectral encoder + 256 RFF val_mae 10.697754; direct spectral head collapsed to 20.631965; 512 RFF improved to 9.722637 and was best SNGP; 1024 RFF, latent 128, hidden 64, LR 5e-4/2e-3, and tilted loss all regressed.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -40,6 +41,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Hard monotonic architectures appear too restrictive for this dataset; soft monotonic regularization preserves more capacity and is the current monotonic direction to tune.
 - NALU arithmetic units are not a good fit here. The only useful ingredient was a simple linear skip path; the arithmetic stack itself did not close the gap.
 - EDL uncertainty parameterization is not helping point MAE on this benchmark; it behaves like an underperforming MLP even after mean-loss and size/LR tuning.
+- SNGP distance-aware regularization helps less than expected for point MAE; random Fourier head is necessary, but capacity/LR tuning did not close the gap.
 
 ## Unexplored directions
 - Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
