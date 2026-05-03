@@ -71,7 +71,7 @@ class TTTMLPRegressor:
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
         self.model_ = TTTNet(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-3)
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=3e-3)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
