@@ -67,7 +67,7 @@ class BiasShiftedGPRegressor(GPRegressor):
         calibration_model = self._make_model()
         calibration_model.fit(X.iloc[train_idx], y_array[train_idx])
         calibration_pred = calibration_model.predict(X.iloc[calibration_idx])
-        self.bias_ = 1.45 * float(np.mean(calibration_pred - y_array[calibration_idx]))
+        self.bias_ = 1.445 * float(np.mean(calibration_pred - y_array[calibration_idx]))
 
         self.model_ = self._make_model()
         self.model_.fit(X, y)
