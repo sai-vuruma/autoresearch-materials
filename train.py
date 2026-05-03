@@ -19,7 +19,7 @@ from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
 class TTTNet(nn.Module):
-    def __init__(self, in_dim, hidden=64, latent=32):
+    def __init__(self, in_dim, hidden=128, latent=32):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_dim, hidden),
@@ -45,7 +45,7 @@ class TTTNet(nn.Module):
 
 
 class TTTMLPRegressor:
-    def __init__(self, random_state=42, ssl_weight=0.3, mask_prob=0.2, adapt_steps=0):
+    def __init__(self, random_state=42, ssl_weight=0.4, mask_prob=0.2, adapt_steps=0):
         self.random_state = random_state
         self.ssl_weight = ssl_weight
         self.mask_prob = mask_prob
