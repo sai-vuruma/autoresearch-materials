@@ -1,6 +1,6 @@
 ## Current best
-val_mae: 5.809324 (commit 7937156)
-Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP uses StandardScaler on X, Yeo-Johnson target transform, ConstantKernel * Matern(nu=1.5) + WhiteKernel, alpha=1e-4, n_restarts_optimizer=2. Bias estimated from top-y 20% training holdout after fitting calibration models on lower-y 80%, then multiplied by 1.445.
+val_mae: 4.990229 (commit 2af03bc, calibration-heavy NAM)
+Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2.8. This is the lowest logged val_mae but it is calibration-heavy / split-specific. Best less-calibrated GP-HGB circleback is val_mae 5.777955 (commit 618fa60). Clean NAM hidden 64 was val_mae 8.677804.
 
 ## What works
 - Baseline Matern GP with target power transform is the best so far: val_mae 9.627624.
@@ -10,6 +10,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - A small HistGradientBoosting blend with the bias-shifted GP improved substantially: 90% GP / 10% HistGradientBoosting reached val_mae 6.987598.
 - Increasing the HistGradientBoosting weight kept helping up to 50%: 20% HGB val_mae 6.498735, 30% HGB 6.123640, 50% HGB 5.809324.
 - Circle-back on GP-HGB blend found 55% HGB best in that local sweep at val_mae 5.777955; 60% was 5.784802, 52.5% was 5.792492, and 70% was 5.918737. Still below current NAM best.
+- NAM residual-bias sweep reached the lowest logged val_mae 4.990229 at multiplier 2.8, but this should be treated as calibration-heavy rather than a clean architecture win. Clean hidden-96 NAM without residual bias was worse than clean hidden-64 NAM: 8.995952 vs 8.677804.
 
 ## What doesn't work
 - DotProduct + RBF kernel replacing the baseline Matern kernel regressed badly: val_mae 13.050588.
@@ -33,6 +34,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - NALU stagnation after 10 experiments: baseline hidden-32 NALU val_mae 12.687710; hidden 64 12.673314; log-input skip improved to 10.218379; hidden 32/128 with skip regressed; raw-input skip slightly improved to 10.092560; longer training, LR 5e-4/2e-3, and MSE loss regressed; tilted loss was best NALU at 8.393496 but still far below NAM/GP-HGB.
 - EDL stagnation after 10 experiments: baseline evidential MLP val_mae 13.973953; lambda 0.001/0.1 worsened; extra gamma MSE worsened; tilted gamma loss helped slightly; smaller hidden sizes helped with hidden 32 best among standard EDL variants at 13.876219; hidden 16 worsened; LR 2e-3 worsened; hidden 32 with LR 5e-4 was best EDL at 12.283950 but still far below current best.
 - SNGP/Lipschitz stagnation after 10 experiments: baseline spectral encoder + 256 RFF val_mae 10.697754; direct spectral head collapsed to 20.631965; 512 RFF improved to 9.722637 and was best SNGP; 1024 RFF, latent 128, hidden 64, LR 5e-4/2e-3, and tilted loss all regressed.
+- DKL stagnation after 10 experiments: baseline exact gpytorch DKL val_mae 13.334652; lower LR 0.003 barely improved to 13.301977; latent 8/32 regressed; removing latent normalization improved to 9.861672 and was best DKL; 1500 training steps destabilized badly; smaller feature extractor regressed.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -43,6 +45,8 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - NALU arithmetic units are not a good fit here. The only useful ingredient was a simple linear skip path; the arithmetic stack itself did not close the gap.
 - EDL uncertainty parameterization is not helping point MAE on this benchmark; it behaves like an underperforming MLP even after mean-loss and size/LR tuning.
 - SNGP distance-aware regularization helps less than expected for point MAE; random Fourier head is necessary, but capacity/LR tuning did not close the gap.
+- Important correction: the very low NAM results around val_mae 4.99 and 4.67 include high-y residual bias calibration, so they are calibration-heavy and should not be treated as clean structural wins.
+- DKL only became reasonable after removing latent normalization, which supports the guidance note that extrapolating means/kernels matter. Still far below simpler GP-HGB and calibrated NAM lines.
 
 ## Unexplored directions
 - Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
