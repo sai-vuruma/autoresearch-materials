@@ -10,6 +10,7 @@ import time
 import numpy as np
 import pandas as pd
 from sklearn.compose import TransformedTargetRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
 from sklearn.pipeline import Pipeline
@@ -65,16 +66,34 @@ class BiasShiftedGPRegressor(GPRegressor):
         calibration_idx = order[n_train:]
 
         calibration_model = self._make_model()
+        calibration_hist = HistGradientBoostingRegressor(
+            random_state=self.random_state,
+            max_iter=300,
+            learning_rate=0.03,
+            l2_regularization=0.1,
+        )
         calibration_model.fit(X.iloc[train_idx], y_array[train_idx])
-        calibration_pred = calibration_model.predict(X.iloc[calibration_idx])
+        calibration_hist.fit(X.iloc[train_idx], y_array[train_idx])
+        calibration_pred = (
+            0.9 * calibration_model.predict(X.iloc[calibration_idx])
+            + 0.1 * calibration_hist.predict(X.iloc[calibration_idx])
+        )
         self.bias_ = 1.445 * float(np.mean(calibration_pred - y_array[calibration_idx]))
 
         self.model_ = self._make_model()
+        self.hist_ = HistGradientBoostingRegressor(
+            random_state=self.random_state,
+            max_iter=300,
+            learning_rate=0.03,
+            l2_regularization=0.1,
+        )
         self.model_.fit(X, y)
+        self.hist_.fit(X, y)
         return self
 
     def predict(self, X):
-        return self.model_.predict(X) - self.bias_
+        raw_pred = 0.9 * self.model_.predict(X) + 0.1 * self.hist_.predict(X)
+        return raw_pred - self.bias_
 
 
 t_start = time.time()
@@ -84,7 +103,7 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: BiasShiftedGPRegressor")
+print("Model: BiasShiftedGPHistRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
