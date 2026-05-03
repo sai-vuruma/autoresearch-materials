@@ -1,6 +1,6 @@
 """
 Autoresearch training script.
-Gated extrapolating MLP on the Concrete dataset.
+Risk Extrapolation (REx) MLP on train-only proxy environments.
 Usage: uv run train.py
 """
 
@@ -12,16 +12,15 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class GatedNet(nn.Module):
+class MLP(nn.Module):
     def __init__(self, in_dim, hidden=128):
         super().__init__()
-        self.mlp = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Linear(in_dim, hidden),
             nn.SiLU(),
             nn.Linear(hidden, hidden),
@@ -30,19 +29,27 @@ class GatedNet(nn.Module):
             nn.SiLU(),
             nn.Linear(64, 1),
         )
-        self.linear = nn.Linear(in_dim, 1)
 
-    def forward(self, x, gate):
-        mlp_pred = self.mlp(x).squeeze(-1)
-        linear_pred = self.linear(x).squeeze(-1)
-        return (1.0 - gate) * mlp_pred + gate * linear_pred
+    def forward(self, x):
+        return self.net(x).squeeze(-1)
 
 
-class GatedExtrapMLPRegressor:
-    def __init__(self, random_state=42):
+class RExMLPRegressor:
+    def __init__(self, random_state=42, rex_lambda=1.0, n_envs=4):
         self.random_state = random_state
+        self.rex_lambda = rex_lambda
+        self.n_envs = n_envs
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
+
+    def _make_envs(self, y):
+        ranks = pd.qcut(
+            pd.Series(y).rank(method="first"),
+            q=self.n_envs,
+            labels=False,
+            duplicates="drop",
+        )
+        return np.asarray(ranks, dtype=np.int64)
 
     def fit(self, X, y):
         torch.manual_seed(self.random_state)
@@ -52,22 +59,14 @@ class GatedExtrapMLPRegressor:
         y_np = self.y_scaler_.fit_transform(np.asarray(y).reshape(-1, 1)).ravel().astype(
             np.float32
         )
-        self.mu_ = x_np.mean(axis=0)
-        cov = np.cov(x_np.T) + 1e-4 * np.eye(x_np.shape[1])
-        self.cov_inv_ = np.linalg.pinv(cov)
-        train_mahal = np.sqrt(
-            np.einsum("ij,jk,ik->i", x_np - self.mu_, self.cov_inv_, x_np - self.mu_)
-        )
-        self.gate_center_ = float(np.quantile(train_mahal, 0.95))
-        self.gate_temp_ = 0.75
+        env_np = self._make_envs(np.asarray(y))
 
         x = torch.from_numpy(x_np)
-        self.ridge_ = RidgeCV(alphas=np.logspace(-3, 3, 13)).fit(x_np, y_np)
-        ridge_train = self.ridge_.predict(x_np).astype(np.float32)
-        y_t = torch.from_numpy(y_np - ridge_train)
-        self.model_ = GatedNet(x.shape[1])
+        y_t = torch.from_numpy(y_np)
+        env_t = torch.from_numpy(env_np)
+        self.model_ = MLP(x.shape[1])
         optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
-        batch_size = 128
+        batch_size = 192
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
 
@@ -75,8 +74,19 @@ class GatedExtrapMLPRegressor:
             idx = torch.randint(0, len(x), (batch_size,))
             xb = x[idx]
             yb = y_t[idx]
-            residual_pred = self.model_(xb, torch.zeros(batch_size))
-            loss = F.smooth_l1_loss(residual_pred, yb, beta=0.5)
+            eb = env_t[idx]
+            pred = self.model_(xb)
+
+            env_losses = []
+            for env_id in range(self.n_envs):
+                mask = eb == env_id
+                if torch.any(mask):
+                    env_losses.append(F.smooth_l1_loss(pred[mask], yb[mask], beta=0.5))
+
+            losses = torch.stack(env_losses)
+            mean_loss = losses.mean()
+            warmup = min(1.0, step / 2500)
+            loss = mean_loss + warmup * self.rex_lambda * losses.var(unbiased=False)
 
             optimizer.zero_grad()
             loss.backward()
@@ -88,18 +98,10 @@ class GatedExtrapMLPRegressor:
         self.model_.eval()
         return self
 
-    def _gate(self, x_np):
-        diffs = x_np - self.mu_
-        mahal = np.sqrt(np.einsum("ij,jk,ik->i", diffs, self.cov_inv_, diffs))
-        return 1.0 / (1.0 + np.exp(-(mahal - self.gate_center_) / self.gate_temp_))
-
     def predict(self, X):
         x_np = self.x_scaler_.transform(X).astype(np.float32)
-        gate_np = self._gate(x_np).astype(np.float32)
         with torch.no_grad():
-            residual_pred = self.model_(torch.from_numpy(x_np), torch.zeros(len(x_np))).numpy()
-        ridge_pred = self.ridge_.predict(x_np)
-        pred = ridge_pred + (1.0 - gate_np) * residual_pred
+            pred = self.model_(torch.from_numpy(x_np)).numpy()
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
@@ -110,11 +112,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: GatedExtrapMLPRegressor")
+print("Model: RExMLPRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = GatedExtrapMLPRegressor()
+model = RExMLPRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
