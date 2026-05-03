@@ -19,7 +19,7 @@ from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
 class ResidualMLP(nn.Module):
-    def __init__(self, in_dim, hidden=64):
+    def __init__(self, in_dim, hidden=32):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden),
