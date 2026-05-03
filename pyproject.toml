@@ -11,5 +11,12 @@ dependencies = [
     "pyarrow>=21.0.0",
     "torch==2.9.1",
     "ucimlrepo",
-    "scikit-learn"
+    "scikit-learn",
+    "tabpfn",
+    "wilds",
+    "mapie",
+    "qpth>=0.0.16",
+    "learn2learn",
+    "gpytorch",
+    "pysr"
 ]

@@ -26,13 +26,14 @@ Once you get confirmation, kick off the experimentation.
 Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
 
 **What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+- Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc. Do NOT try to read the test dataset.
 - Update `findings.md` — you must keep this file current (see Knowledge Management below).
 
 **What you CANNOT do:**
 - Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, and training constants (time budget, max epochs, etc).
+- Read the test dataset created and read in `prepare.py`. It will only be handled in `prepare.py` and must be hidden at all times from model training.
 - Overfit models such as Neural Networks by setting the number of epochs to high values. Observe loss and use regularization for such approaches and reduce number of epochs accordingly to avoid overfitting.
-- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
+- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`. If you need new libraries or dependencies installed, inform the human.
 - Modify the evaluation harness. The `evaluate_model` function in `prepare.py` is the ground truth metric.
 
 **The goal is simple: get the lowest val_mae.** Since the time budget is fixed, you don't need to worry about training time — it's always 5 minutes. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size. The only constraint is that the code runs without crashing and finishes within the time budget.
