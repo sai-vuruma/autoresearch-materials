@@ -70,9 +70,15 @@ class GatedExtrapMLPRegressor:
 
         while time.time() < deadline and step < 25000:
             idx = torch.randint(0, len(x), (batch_size,))
-            gate = torch.zeros(batch_size)
-            pred = self.model_(x[idx], gate)
-            loss = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
+            xb = x[idx]
+            yb = y_t[idx]
+            mlp_pred = self.model_(xb, torch.zeros(batch_size))
+            linear_pred = self.model_(xb, torch.ones(batch_size))
+            random_gate = torch.rand(batch_size)
+            mixed_pred = self.model_(xb, random_gate)
+            loss = F.smooth_l1_loss(mlp_pred, yb, beta=0.5)
+            loss = loss + 0.5 * F.smooth_l1_loss(linear_pred, yb, beta=0.5)
+            loss = loss + 0.5 * F.smooth_l1_loss(mixed_pred, yb, beta=0.5)
 
             optimizer.zero_grad()
             loss.backward()
