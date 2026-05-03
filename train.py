@@ -57,7 +57,7 @@ class DeltaRidgeMLPRegressor:
         x = torch.from_numpy(x_np)
         residual_t = torch.from_numpy(residual_np)
         self.model_ = ResidualMLP(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-3)
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=5e-4, weight_decay=1e-4)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
