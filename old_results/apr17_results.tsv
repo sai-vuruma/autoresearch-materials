@@ -1,0 +1,53 @@
+commit	val_mae	val_r2	val_rmse	memory_gb	status	description
+1988f07	32.208550	-14.299123	34.152239	0.0	keep	baseline
+32f95e4	9.921234	-0.913129	12.076973	0.0	keep	replace MLP with standardized Matern GP regressor
+1e4ab26	10.562639	-1.192993	12.930180	0.0	discard	swap the simple Matern GP kernel for RationalQuadratic
+f502724	9.921232	-0.913129	12.076971	0.0	keep	raise GP jitter/noise floor and reduce optimizer restarts
+61fcde9	9.662166	-0.855929	11.895060	0.0	keep	reduce Matern smoothness to nu=1.5 on the regularized GP
+95a668c	12.364519	-1.894533	14.855087	0.0	discard	reduce Matern smoothness further to nu=0.5
+5e957d3	9.662166	-0.855929	11.895059	0.0	discard	increase explicit GP jitter from 1e-4 to 1e-3
+68dd77f	9.662166	-0.855929	11.895060	0.0	discard	remove redundant GP-side target normalization
+f7a0cb4	10.243857	-1.217574	13.002442	0.0	discard	JTT-style second GP fit that duplicates top-residual training samples
+2640e19	9.662166	-0.855929	11.895060	0.0	discard	increase GP optimizer restarts from 2 to 8
+5d23fde	9.662166	-0.855929	11.895060	0.0	discard	lower white-noise initialization from 0.3 to 0.1
+6599c50	12.876797	-1.788137	14.579512	0.0	discard	average the best GP with a standardized ridge regressor
+f236159	14.918993	-2.666974	16.720137	0.0	discard	train an MLP encoder and fit the GP on learned latent features
+f3dc612	12.625707	-1.747249	14.472211	0.0	discard	train an age-binned REx MLP with four hand-crafted environments
+94fd26a	11.813096	-1.430216	13.611575	0.0	discard	augment the GP inputs with one-hot Age-bin indicators
+1c6e542	21.303638	-5.973462	23.057389	0.0	discard	switch to an ExtraTreesRegressor baseline
+96d7e47	23.009283	-7.043365	24.763088	0.0	discard	switch to a distance-weighted KNeighborsRegressor baseline
+3ff80b9	16.254503	-3.875108	19.278713	0.0	discard	switch to an RBF KernelRidge baseline
+79b60da	13.815566	-2.555267	16.463496	0.0	discard	switch to an RBF SVR baseline
+1190213	14.458037	-2.401672	16.103939	0.0	discard	switch to a shallow huber GradientBoostingRegressor baseline
+2d88a07	19.970491	-5.273388	21.869405	0.0	discard	switch to a RandomForestRegressor baseline
+53aac18	19.062600	-4.605541	20.672580	0.0	discard	switch to a BayesianRidge baseline
+0edae23	17.375046	-3.781379	19.092487	0.0	discard	switch to a HuberRegressor baseline
+895c49b	13.472156	-2.331898	15.937925	0.0	discard	use Yeo-Johnson feature transform with the best GP
+e4a39af	9.627625	-0.855563	11.893885	0.0	keep	use a Yeo-Johnson target transform with the best GP
+8f497fd	9.627625	-0.855563	11.893885	0.0	discard	disable GP normalize_y after adding the Yeo-Johnson target transform
+3f770b9	9.627625	-0.855563	11.893885	0.0	discard	lower GP jitter from 1e-4 to 1e-5 after the target transform
+993f4ea	15.066456	-4.350138	20.196142	0.0	discard	switch the best GP target transform from Yeo-Johnson to log1p
+d988118	9.629687	-0.854696	11.891106	0.0	discard	switch the best GP target transform from Yeo-Johnson to Box-Cox
+eda7bc5	14.460713	-2.578630	16.517500	0.0	discard	switch the best GP target transform from Yeo-Johnson to quantile-normalized Gaussian targets
+e6d1a84	9.627624	-0.855563	11.893885	0.0	keep	raise white-noise initialization from 0.3 to 1.0 on the target-transform GP
+8e94fcb	9.627625	-0.855563	11.893886	0.0	discard	increase optimizer restarts from 2 to 8 on the target-transform GP
+db21aa0	9.983366	-0.936194	12.149555	0.0	discard	switch the target-transform GP back to a smoother Matern nu=2.5
+404c4fb	9.627625	-0.855563	11.893885	0.0	discard	raise white-noise initialization further from 1.0 to 3.0
+8645254	9.636740	-0.853531	11.887372	0.0	discard	average the raw-target and Yeo-Johnson-target GPs
+3f597a7	9.629771	-0.854218	11.889576	0.0	discard	use an 80/20 weighted ensemble of Yeo-Johnson and raw-target GPs
+e23a952	9.627624	-0.855563	11.893885	0.0	discard	use an 80/20 weighted ensemble of the two nearby Yeo-Johnson GPs
+db1658d	9.627823	-0.855459	11.893552	0.0	discard	use a 90/10 weighted ensemble of Yeo-Johnson and Box-Cox GPs
+9c85fe0	9.628618	-0.855081	11.892342	0.0	discard	average the Yeo-Johnson and Box-Cox target-transform GPs
+7406df7	9.833591	-0.910740	12.069427	0.0	discard	stack two GP variants with a ridge meta-learner
+33d625b	9.630553	-0.856615	11.897258	0.0	discard	add a residual-correction GP on top of the best target-transform GP
+87f44fb	9.627624	-0.855563	11.893885	0.0	discard	use a threshold gate between Yeo-Johnson and Box-Cox GPs
+2e68667	9.627624	-0.855563	11.893885	0.0	discard	use a disagreement gate between Yeo-Johnson and raw-target GPs
+77e9d65	9.627624	-0.855563	11.893885	0.0	discard	use a 90/10 weighted ensemble of the two nearby Yeo-Johnson GPs
+64631e2	19.304223	-4.796131	21.021078	0.0	discard	replace the GP with a test-time-training MLP using masked-feature reconstruction
+d31f38d	15.829698	-3.322214	18.152609	0.0	discard	replace the GP with a pseudo-environment Group DRO MLP over age and cement bins
+b496115	12.423464	-2.185265	15.583273	0.0	discard	replace the GP with a spectral-normalized neural GP using random Fourier features
+4cad859	15.349213	-3.060818	17.595138	0.0	discard	replace the GP with a pseudo-environment REx MLP over age and cement bins
+acd8399	30.409513	-12.115962	31.621756	0.0	discard	replace the GP with a pseudo-environment IRM MLP over age and cement bins
+4cad859	15.349213	-3.060818	17.595138	0.0	discard	replace the GP with a pseudo-environment REx MLP over age and cement bins
+acd8399	30.409513	-12.115962	31.621756	0.0	discard	replace the GP with a pseudo-environment IRM MLP over age and cement bins
+ba121d3	9.377819	-0.812468	11.754957	0.0	keep	add weighted conformal-style covariate-shift residual correction on top of the best GP

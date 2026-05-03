@@ -16,10 +16,11 @@ queue/
 # Agent prompt files (generated per-session by launchers)
 CLAUDE.md
 AGENTS.md
-findings.md
+*findings.md
 
 # Experimental code/artifacts
 dev/
+old_results/
 
 # Results file
 *results.tsv
