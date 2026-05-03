@@ -1,6 +1,6 @@
 """
 Autoresearch training script.
-Neural Additive Model on the Concrete dataset.
+Gated extrapolating MLP on the Concrete dataset.
 Usage: uv run train.py
 """
 
@@ -17,37 +17,31 @@ from sklearn.preprocessing import StandardScaler
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class NAM(nn.Module):
-    def __init__(self, in_dim, hidden=64):
+class GatedNet(nn.Module):
+    def __init__(self, in_dim, hidden=128):
         super().__init__()
-        self.feature_nets = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(1, hidden),
-                    nn.SiLU(),
-                    nn.Linear(hidden, hidden),
-                    nn.SiLU(),
-                    nn.Linear(hidden, 1),
-                )
-                for _ in range(in_dim)
-            ]
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, hidden),
+            nn.SiLU(),
+            nn.Linear(hidden, 64),
+            nn.SiLU(),
+            nn.Linear(64, 1),
         )
-        self.bias = nn.Parameter(torch.zeros(()))
+        self.linear = nn.Linear(in_dim, 1)
 
-    def forward(self, x):
-        terms = [net(x[:, i : i + 1]).squeeze(-1) for i, net in enumerate(self.feature_nets)]
-        return torch.stack(terms, dim=0).sum(dim=0) + self.bias
+    def forward(self, x, gate):
+        mlp_pred = self.mlp(x).squeeze(-1)
+        linear_pred = self.linear(x).squeeze(-1)
+        return (1.0 - gate) * mlp_pred + gate * linear_pred
 
 
-class NAMRegressor:
+class GatedExtrapMLPRegressor:
     def __init__(self, random_state=42):
         self.random_state = random_state
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
-
-    def _tilted_loss(self, pred, target, tau=0.68):
-        err = target - pred
-        return torch.maximum(tau * err, (tau - 1.0) * err).mean()
 
     def fit(self, X, y):
         torch.manual_seed(self.random_state)
@@ -57,20 +51,28 @@ class NAMRegressor:
         y_np = self.y_scaler_.fit_transform(np.asarray(y).reshape(-1, 1)).ravel().astype(
             np.float32
         )
+        self.mu_ = x_np.mean(axis=0)
+        cov = np.cov(x_np.T) + 1e-4 * np.eye(x_np.shape[1])
+        self.cov_inv_ = np.linalg.pinv(cov)
+        train_mahal = np.sqrt(
+            np.einsum("ij,jk,ik->i", x_np - self.mu_, self.cov_inv_, x_np - self.mu_)
+        )
+        self.gate_center_ = float(np.quantile(train_mahal, 0.75))
+        self.gate_temp_ = 0.75
+
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
-
-        self.model_ = NAM(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=2e-3, weight_decay=2e-4)
+        self.model_ = GatedNet(x.shape[1])
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
 
         while time.time() < deadline and step < 25000:
             idx = torch.randint(0, len(x), (batch_size,))
-            pred = self.model_(x[idx])
-            huber = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
-            loss = huber + 0.15 * self._tilted_loss(pred, y_t[idx])
+            gate = torch.zeros(batch_size)
+            pred = self.model_(x[idx], gate)
+            loss = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
 
             optimizer.zero_grad()
             loss.backward()
@@ -80,16 +82,18 @@ class NAMRegressor:
 
         self.num_steps_ = step
         self.model_.eval()
-        with torch.no_grad():
-            train_pred = self.model_(x).numpy()
-        top_idx = np.argsort(np.asarray(y))[-len(y_np) // 5 :]
-        self.bias_ = 2.8 * float(np.mean(train_pred[top_idx] - y_np[top_idx]))
         return self
+
+    def _gate(self, x_np):
+        diffs = x_np - self.mu_
+        mahal = np.sqrt(np.einsum("ij,jk,ik->i", diffs, self.cov_inv_, diffs))
+        return 1.0 / (1.0 + np.exp(-(mahal - self.gate_center_) / self.gate_temp_))
 
     def predict(self, X):
         x_np = self.x_scaler_.transform(X).astype(np.float32)
+        gate_np = self._gate(x_np).astype(np.float32)
         with torch.no_grad():
-            pred = self.model_(torch.from_numpy(x_np)).numpy() - self.bias_
+            pred = self.model_(torch.from_numpy(x_np), torch.from_numpy(gate_np)).numpy()
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
@@ -100,11 +104,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: NAMRegressor")
+print("Model: GatedExtrapMLPRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = NAMRegressor()
+model = GatedExtrapMLPRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
