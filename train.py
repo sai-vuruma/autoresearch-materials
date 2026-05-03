@@ -38,7 +38,7 @@ class ResidualMLP(nn.Module):
 class DeltaRidgeMLPRegressor:
     def __init__(self, random_state=42):
         self.random_state = random_state
-        self.residual_scale = 0.5
+        self.residual_scale = 1.5
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
