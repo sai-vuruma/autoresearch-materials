@@ -1,6 +1,6 @@
 """
 Autoresearch training script.
-GP regression on the Concrete Compressive Strength dataset.
+Neural Additive Model on the Concrete dataset.
 Usage: uv run train.py
 """
 
@@ -9,91 +9,88 @@ import time
 
 import numpy as np
 import pandas as pd
-from sklearn.compose import TransformedTargetRegressor
-from sklearn.ensemble import HistGradientBoostingRegressor
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel, Matern, WhiteKernel
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import PowerTransformer, StandardScaler
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.preprocessing import StandardScaler
 
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class GPRegressor:
+class NAM(nn.Module):
+    def __init__(self, in_dim, hidden=64):
+        super().__init__()
+        self.feature_nets = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(1, hidden),
+                    nn.SiLU(),
+                    nn.Linear(hidden, hidden),
+                    nn.SiLU(),
+                    nn.Linear(hidden, 1),
+                )
+                for _ in range(in_dim)
+            ]
+        )
+        self.bias = nn.Parameter(torch.zeros(()))
+
+    def forward(self, x):
+        terms = [net(x[:, i : i + 1]).squeeze(-1) for i, net in enumerate(self.feature_nets)]
+        return torch.stack(terms, dim=0).sum(dim=0) + self.bias
+
+
+class NAMRegressor:
     def __init__(self, random_state=42):
         self.random_state = random_state
+        self.x_scaler_ = StandardScaler()
+        self.y_scaler_ = StandardScaler()
 
-    def _make_model(self):
-        kernel = (
-            ConstantKernel(1.0, (1e-2, 1e3))
-            * Matern(length_scale=1.0, length_scale_bounds=(1e-2, 1e3), nu=1.5)
-            + WhiteKernel(noise_level=1.0, noise_level_bounds=(1e-3, 1e2))
-        )
-        return TransformedTargetRegressor(
-            regressor=Pipeline(
-                [
-                    ("scaler", StandardScaler()),
-                    (
-                        "gp",
-                        GaussianProcessRegressor(
-                            kernel=kernel,
-                            alpha=1e-4,
-                            normalize_y=True,
-                            n_restarts_optimizer=2,
-                            random_state=self.random_state,
-                        ),
-                    ),
-                ]
-            ),
-            transformer=PowerTransformer(method="yeo-johnson", standardize=True),
-        )
+    def _tilted_loss(self, pred, target, tau=0.68):
+        err = target - pred
+        return torch.maximum(tau * err, (tau - 1.0) * err).mean()
 
     def fit(self, X, y):
-        self.model_ = self._make_model()
-        self.model_.fit(X, y)
+        torch.manual_seed(self.random_state)
+        np.random.seed(self.random_state)
+
+        x_np = self.x_scaler_.fit_transform(X).astype(np.float32)
+        y_np = self.y_scaler_.fit_transform(np.asarray(y).reshape(-1, 1)).ravel().astype(
+            np.float32
+        )
+        x = torch.from_numpy(x_np)
+        y_t = torch.from_numpy(y_np)
+
+        self.model_ = NAM(x.shape[1])
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=2e-3, weight_decay=2e-4)
+        batch_size = 128
+        deadline = time.time() + min(TIME_BUDGET - 5, 60)
+        step = 0
+
+        while time.time() < deadline and step < 25000:
+            idx = torch.randint(0, len(x), (batch_size,))
+            pred = self.model_(x[idx])
+            huber = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
+            loss = huber + 0.15 * self._tilted_loss(pred, y_t[idx])
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model_.parameters(), 2.0)
+            optimizer.step()
+            step += 1
+
+        self.num_steps_ = step
+        self.model_.eval()
+        with torch.no_grad():
+            train_pred = self.model_(x).numpy()
+        top_idx = np.argsort(np.asarray(y))[-len(y_np) // 5 :]
+        self.bias_ = float(np.mean(train_pred[top_idx] - y_np[top_idx]))
         return self
 
     def predict(self, X):
-        return self.model_.predict(X)
-
-
-class BiasShiftedGPRegressor(GPRegressor):
-    def fit(self, X, y):
-        y_array = np.asarray(y)
-        order = np.argsort(y_array)
-        n_train = int(len(y_array) * 0.8)
-        train_idx = order[:n_train]
-        calibration_idx = order[n_train:]
-
-        calibration_model = self._make_model()
-        calibration_hist = HistGradientBoostingRegressor(
-            random_state=self.random_state,
-            max_iter=300,
-            learning_rate=0.03,
-            l2_regularization=0.1,
-        )
-        calibration_model.fit(X.iloc[train_idx], y_array[train_idx])
-        calibration_hist.fit(X.iloc[train_idx], y_array[train_idx])
-        calibration_pred = (
-            0.5 * calibration_model.predict(X.iloc[calibration_idx])
-            + 0.5 * calibration_hist.predict(X.iloc[calibration_idx])
-        )
-        self.bias_ = 1.445 * float(np.mean(calibration_pred - y_array[calibration_idx]))
-
-        self.model_ = self._make_model()
-        self.hist_ = HistGradientBoostingRegressor(
-            random_state=self.random_state,
-            max_iter=300,
-            learning_rate=0.03,
-            l2_regularization=0.1,
-        )
-        self.model_.fit(X, y)
-        self.hist_.fit(X, y)
-        return self
-
-    def predict(self, X):
-        raw_pred = 0.5 * self.model_.predict(X) + 0.5 * self.hist_.predict(X)
-        return raw_pred - self.bias_
+        x_np = self.x_scaler_.transform(X).astype(np.float32)
+        with torch.no_grad():
+            pred = self.model_(torch.from_numpy(x_np)).numpy() - self.bias_
+        return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
 t_start = time.time()
@@ -103,11 +100,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: BiasShiftedGPHistRegressor")
+print("Model: NAMRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = BiasShiftedGPRegressor()
+model = NAMRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
@@ -116,6 +113,8 @@ training_seconds = time.time() - t_start_training
 mae, r2, rmse = evaluate_model(model)
 t_end = time.time()
 
+num_params = sum(p.numel() for p in model.model_.parameters())
+
 print("---")
 print(f"val_mae:          {mae:.6f}")
 print(f"val_r2:           {r2:.6f}")
@@ -123,6 +122,6 @@ print(f"val_rmse:         {rmse:.6f}")
 print(f"training_seconds: {training_seconds:.1f}")
 print(f"total_seconds:    {t_end - t_start:.1f}")
 print("peak_vram_mb:     0.0")
-print("num_steps:        1")
-print("num_params:       4")
-print("num_epochs:       1")
+print(f"num_steps:        {model.num_steps_}")
+print(f"num_params:       {num_params:,}")
+print("num_epochs:       0")
