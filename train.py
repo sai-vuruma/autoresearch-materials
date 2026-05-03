@@ -1,10 +1,9 @@
 """
 Autoresearch training script.
-Test-time-training MLP with masked feature reconstruction.
+Just Train Twice (JTT) hard-sample reweighted MLP.
 Usage: uv run train.py
 """
 
-import copy
 import os
 import time
 
@@ -18,47 +17,48 @@ from sklearn.preprocessing import StandardScaler
 from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
-class TTTNet(nn.Module):
-    def __init__(self, in_dim, hidden=64, latent=16):
+class MLP(nn.Module):
+    def __init__(self, in_dim, hidden=64):
         super().__init__()
-        self.encoder = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Linear(in_dim, hidden),
             nn.SiLU(),
-            nn.Linear(hidden, latent),
+            nn.Linear(hidden, hidden),
             nn.SiLU(),
-        )
-        self.reg_head = nn.Linear(latent, 1)
-        self.ssl_head = nn.Sequential(
-            nn.Linear(latent, hidden),
+            nn.Linear(hidden, 32),
             nn.SiLU(),
-            nn.Linear(hidden, in_dim),
+            nn.Linear(32, 1),
         )
 
-    def encode(self, x):
-        return self.encoder(x)
-
-    def predict_y(self, x):
-        return self.reg_head(self.encode(x)).squeeze(-1)
-
-    def reconstruct_x(self, x):
-        return self.ssl_head(self.encode(x))
+    def forward(self, x):
+        return self.net(x).squeeze(-1)
 
 
-class TTTMLPRegressor:
-    def __init__(self, random_state=42, ssl_weight=0.4, mask_prob=0.2, adapt_steps=0):
+class JTTMLPRegressor:
+    def __init__(self, random_state=42, hard_frac=0.2, hard_weight=5.0):
         self.random_state = random_state
-        self.ssl_weight = ssl_weight
-        self.mask_prob = mask_prob
-        self.adapt_steps = adapt_steps
+        self.hard_frac = hard_frac
+        self.hard_weight = hard_weight
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
-    def _masked_reconstruction_loss(self, x):
-        mask = (torch.rand_like(x) < self.mask_prob).float()
-        masked_x = x * (1.0 - mask)
-        recon = self.model_.reconstruct_x(masked_x)
-        denom = mask.sum().clamp_min(1.0)
-        return (((recon - x) * mask).pow(2).sum() / denom)
+    def _train_model(self, x, y_t, weights, steps, lr=1e-3):
+        model = MLP(x.shape[1])
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+        batch_size = 128
+        step = 0
+        while step < steps:
+            idx = torch.randint(0, len(x), (batch_size,))
+            pred = model(x[idx])
+            per_sample = F.smooth_l1_loss(pred, y_t[idx], beta=0.5, reduction="none")
+            loss = (per_sample * weights[idx]).mean()
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+            optimizer.step()
+            step += 1
+        model.eval()
+        return model
 
     def fit(self, X, y):
         torch.manual_seed(self.random_state)
@@ -70,62 +70,29 @@ class TTTMLPRegressor:
         )
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
-        self.model_ = TTTNet(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=3e-3)
-        batch_size = 128
+        base_weights = torch.ones(len(x))
+
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
-        step = 0
+        warmup_steps = 8000
+        train_steps = 17000
+        self.warm_model_ = self._train_model(x, y_t, base_weights, warmup_steps)
 
-        while time.time() < deadline and step < 25000:
-            idx = torch.randint(0, len(x), (batch_size,))
-            xb = x[idx]
-            pred = self.model_.predict_y(xb)
-            reg_loss = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
-            ssl_loss = self._masked_reconstruction_loss(xb)
-            loss = reg_loss + self.ssl_weight * ssl_loss
+        with torch.no_grad():
+            losses = F.smooth_l1_loss(self.warm_model_(x), y_t, beta=0.5, reduction="none")
+        threshold = torch.quantile(losses, 1.0 - self.hard_frac)
+        weights = torch.ones(len(x))
+        weights[losses >= threshold] = self.hard_weight
+        weights = weights / weights.mean()
 
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(self.model_.parameters(), 2.0)
-            optimizer.step()
-            step += 1
-
-        self.num_steps_ = step
-        self.model_.eval()
+        remaining = max(1000, min(train_steps, int((deadline - time.time()) * 1000)))
+        self.model_ = self._train_model(x, y_t, weights, remaining)
+        self.num_steps_ = warmup_steps + remaining
         return self
-
-    def _adapt(self, x):
-        encoder_state = copy.deepcopy(self.model_.encoder.state_dict())
-        ssl_state = copy.deepcopy(self.model_.ssl_head.state_dict())
-        self.model_.encoder.train()
-        self.model_.ssl_head.train()
-        self.model_.reg_head.eval()
-        optimizer = torch.optim.AdamW(
-            list(self.model_.encoder.parameters()) + list(self.model_.ssl_head.parameters()),
-            lr=1e-4,
-            weight_decay=0.0,
-        )
-        for _ in range(self.adapt_steps):
-            loss = self._masked_reconstruction_loss(x)
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(
-                list(self.model_.encoder.parameters()) + list(self.model_.ssl_head.parameters()),
-                2.0,
-            )
-            optimizer.step()
-        self.model_.eval()
-        return encoder_state, ssl_state
 
     def predict(self, X):
         x_np = self.x_scaler_.transform(X).astype(np.float32)
-        x = torch.from_numpy(x_np)
-        encoder_state, ssl_state = self._adapt(x)
         with torch.no_grad():
-            pred = self.model_.predict_y(x).numpy()
-        self.model_.encoder.load_state_dict(encoder_state)
-        self.model_.ssl_head.load_state_dict(ssl_state)
-        self.model_.eval()
+            pred = self.model_(torch.from_numpy(x_np)).numpy()
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
@@ -136,11 +103,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: TTTMLPRegressor")
+print("Model: JTTMLPRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = TTTMLPRegressor()
+model = JTTMLPRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
