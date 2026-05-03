@@ -28,6 +28,7 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Extrapolation mixup MLP with tilted underprediction loss was much worse: val_mae 17.395464.
 - Non-GP guidance attempts so far are below the GP/HGB best: quantile HGB val_mae 14.784369, anchor-point HGB 15.864447, NAM 8.677804.
 - Monotonic-family tuning is active per human guidance. Pure positive-weight monotonic MLP was very poor (21.067557); partial monotonic with free path improved but still poor (17.404421); soft gradient-penalty monotonic MLP is best in family so far (11.782069 with penalty 0.2). Reducing penalty to 0.05 worsened to 12.623925.
+- Monotonic stagnation: 10 monotonic-family experiments all failed to approach the current best. Stronger penalty 0.5 worsened to 14.259600; feature masks at abs-corr >=0.4 and >=0.15 worsened to 12.826622 and 13.303174; longer training worsened to 12.306579; LR 3e-3 and 7.5e-4 worsened to 13.789898 and 14.383346.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -37,6 +38,6 @@ Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Hard monotonic architectures appear too restrictive for this dataset; soft monotonic regularization preserves more capacity and is the current monotonic direction to tune.
 
 ## Unexplored directions
-- Continue fine-tuning the current monotonic approach for 10-15 total experiments before switching, unless stagnation/crashes make it unproductive.
+- Switch away from monotonic after stagnation. Next best non-GP direction is NAM-style models (best non-GP so far val_mae 8.677804) and tune for a sustained run before switching again.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
 - Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
