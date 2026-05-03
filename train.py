@@ -58,12 +58,13 @@ class GatedExtrapMLPRegressor:
         train_mahal = np.sqrt(
             np.einsum("ij,jk,ik->i", x_np - self.mu_, self.cov_inv_, x_np - self.mu_)
         )
-        self.gate_center_ = float(np.quantile(train_mahal, 0.75))
+        self.gate_center_ = float(np.quantile(train_mahal, 0.95))
         self.gate_temp_ = 0.75
 
         x = torch.from_numpy(x_np)
-        y_t = torch.from_numpy(y_np)
         self.ridge_ = RidgeCV(alphas=np.logspace(-3, 3, 13)).fit(x_np, y_np)
+        ridge_train = self.ridge_.predict(x_np).astype(np.float32)
+        y_t = torch.from_numpy(y_np - ridge_train)
         self.model_ = GatedNet(x.shape[1])
         optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
         batch_size = 128
@@ -74,8 +75,8 @@ class GatedExtrapMLPRegressor:
             idx = torch.randint(0, len(x), (batch_size,))
             xb = x[idx]
             yb = y_t[idx]
-            mlp_pred = self.model_(xb, torch.zeros(batch_size))
-            loss = F.smooth_l1_loss(mlp_pred, yb, beta=0.5)
+            residual_pred = self.model_(xb, torch.zeros(batch_size))
+            loss = F.smooth_l1_loss(residual_pred, yb, beta=0.5)
 
             optimizer.zero_grad()
             loss.backward()
@@ -96,9 +97,9 @@ class GatedExtrapMLPRegressor:
         x_np = self.x_scaler_.transform(X).astype(np.float32)
         gate_np = self._gate(x_np).astype(np.float32)
         with torch.no_grad():
-            mlp_pred = self.model_(torch.from_numpy(x_np), torch.zeros(len(x_np))).numpy()
+            residual_pred = self.model_(torch.from_numpy(x_np), torch.zeros(len(x_np))).numpy()
         ridge_pred = self.ridge_.predict(x_np)
-        pred = (1.0 - gate_np) * mlp_pred + gate_np * ridge_pred
+        pred = ridge_pred + (1.0 - gate_np) * residual_pred
         return self.y_scaler_.inverse_transform(pred.reshape(-1, 1)).ravel()
 
 
