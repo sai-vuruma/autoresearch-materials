@@ -45,7 +45,7 @@ class TTTNet(nn.Module):
 
 
 class TTTMLPRegressor:
-    def __init__(self, random_state=42, ssl_weight=0.4, mask_prob=0.2, adapt_steps=5):
+    def __init__(self, random_state=42, ssl_weight=0.4, mask_prob=0.2, adapt_steps=0):
         self.random_state = random_state
         self.ssl_weight = ssl_weight
         self.mask_prob = mask_prob
@@ -71,7 +71,7 @@ class TTTMLPRegressor:
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
         self.model_ = TTTNet(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=5e-4, weight_decay=1e-4)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
