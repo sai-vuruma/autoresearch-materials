@@ -45,7 +45,7 @@ class NAMRegressor:
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
-    def _tilted_loss(self, pred, target, tau=0.95):
+    def _tilted_loss(self, pred, target, tau=0.98):
         err = target - pred
         return torch.maximum(tau * err, (tau - 1.0) * err).mean()
 
