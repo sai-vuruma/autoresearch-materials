@@ -83,7 +83,7 @@ class NAMRegressor:
         with torch.no_grad():
             train_pred = self.model_(x).numpy()
         top_idx = np.argsort(np.asarray(y))[-len(y_np) // 5 :]
-        self.bias_ = 2.0 * float(np.mean(train_pred[top_idx] - y_np[top_idx]))
+        self.bias_ = 2.2 * float(np.mean(train_pred[top_idx] - y_np[top_idx]))
         return self
 
     def predict(self, X):
