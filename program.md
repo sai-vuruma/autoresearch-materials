@@ -15,8 +15,9 @@ To set up a new experiment, work with the user to:
    - `findings.md` — accumulated knowledge from prior sessions (if it exists). Read this first.
    - `guidance.md` — human steering notes (if it exists). Follow any directions here.
 4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data. If not, tell the human to run `uv run prepare.py`.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
-6. **Confirm and go**: Confirm setup looks good.
+5. **Verify all dependencies are installed**: Check approaches listed in `guidance.md` and current findings in `findings.md` (if it exists) against `pyproject.toml`. If there are any libraries or dependies that don't exist in `pyproject.toml` which block you from testing approachces in `guidance.md` or unexplored approaches in `findings.md`, tell the human to install them.
+6. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
+7. **Confirm and go**: Confirm setup looks good.
 
 Once you get confirmation, kick off the experimentation.
 
@@ -161,7 +162,10 @@ LOOP FOREVER:
 1. **Plan** (guidance step):
    - Read `guidance.md` if it exists — follow any human directions.
    - Read `findings.md` if it exists — review what's known.
-   - Check for stagnation (see above).
+   - Pick an approach from `guidance.md` if it exists and keep improving it.
+   - Check for stagnation (see above). If detected, pick a different approach from `guidance.md`.
+   - If `guidance.md` is exhausted (all approaches have been experimented with until stagnation), explore unexplored directions in `findings.md`. And continue the process.
+   - If there are no more unexplored directions in `findings.md`, revert back to best approach overall from `results.tsv` and `findigs.md`. And continue the process.
    - Decide: parameter tuning or structural exploration? Write a one-line rationale.
 2. Tune `train.py` with the chosen experimental idea by directly hacking the code.
 3. git commit
