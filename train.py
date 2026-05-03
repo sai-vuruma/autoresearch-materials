@@ -38,7 +38,7 @@ class ResidualMLP(nn.Module):
 class DeltaRidgeMLPRegressor:
     def __init__(self, random_state=42):
         self.random_state = random_state
-        self.residual_scale = 1.5
+        self.residual_scale = 1.0
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
@@ -57,7 +57,7 @@ class DeltaRidgeMLPRegressor:
         x = torch.from_numpy(x_np)
         residual_t = torch.from_numpy(residual_np)
         self.model_ = ResidualMLP(x.shape[1])
-        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-3)
         batch_size = 128
         deadline = time.time() + min(TIME_BUDGET - 5, 60)
         step = 0
