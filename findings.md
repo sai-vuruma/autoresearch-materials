@@ -37,6 +37,7 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - DKL stagnation after 10 experiments: baseline exact gpytorch DKL val_mae 13.334652; lower LR 0.003 barely improved to 13.301977; latent 8/32 regressed; removing latent normalization improved to 9.861672 and was best DKL; 1500 training steps destabilized badly; smaller feature extractor regressed.
 - Gated ExtrapMLP stagnation after 10 experiments: baseline gated MLP val_mae 23.816717 because the linear inference path was untrained; training both paths improved to 14.838245; delaying fallback improved slightly to 14.493049 and was best in family. Stronger linear-path loss, 99th-percentile gate centers, smoother gates, empirical-gate training, RidgeCV fallback, earlier RidgeCV fallback, and gated residual-over-Ridge all regressed.
 - REx/IRM-style tuning after 15 experiments: four target-quantile proxy environments were poor, with lambda 1.0/0.1/0.01 yielding 16.745895/16.143206/16.076845. Two proxy environments were better; lambda 1.0 reached 13.980288. Reducing capacity helped: hidden 64 reached 13.613668, hidden 32 reached 12.265790, and hidden 16 with lambda 3.0 was best at 11.200681. Hidden 8 collapsed and lambda 5.0 regressed, so the family is plateaued far below GP-HGB.
+- Delta Ridge MLP stagnation after 10 experiments: baseline RidgeCV plus residual MLP reached 12.625052. Hidden 32 and 128 regressed; SmoothL1 beta 0.5/0.1 and MSE regressed; residual scale 0.5/1.5 regressed; weight decay 1e-3 regressed. Lowering LR to 5e-4 was best at 11.844453, still worse than compact REx and far below GP-HGB.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -51,6 +52,7 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - DKL only became reasonable after removing latent normalization, which supports the guidance note that extrapolating means/kernels matter. Still far below simpler GP-HGB and calibrated NAM lines.
 - Gated extrapolating MLP is not competitive here. The fallback mechanism mostly trades one underfit neural path for another; using RidgeCV as the fallback did not help, so this family is stagnated.
 - REx with train-only target proxy environments acts mostly like regularization. Compact networks help, but the approach still underpredicts the high-y OOD tail and does not approach clean GP-HGB performance.
+- Delta Ridge MLP did not realize the guidance ranking on this split. The residual MLP appears to damage OOD extrapolation more often than it helps; plain Ridge extrapolation plus learned residuals stays in the 11.8+ MAE range.
 
 ## Unexplored directions
 - Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
