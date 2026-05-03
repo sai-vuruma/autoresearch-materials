@@ -1,6 +1,6 @@
 ## Current best
-val_mae: 6.987598 (commit d87a9ed)
-Key config: 90/10 blend of bias-shifted GP and HistGradientBoostingRegressor. GP uses StandardScaler on X, Yeo-Johnson target transform, ConstantKernel * Matern(nu=1.5) + WhiteKernel, alpha=1e-4, n_restarts_optimizer=2. Bias estimated from top-y 20% training holdout after fitting calibration models on lower-y 80%, then multiplied by 1.445.
+val_mae: 5.809324 (commit 7937156)
+Key config: 50/50 blend of bias-shifted GP and HistGradientBoostingRegressor. GP uses StandardScaler on X, Yeo-Johnson target transform, ConstantKernel * Matern(nu=1.5) + WhiteKernel, alpha=1e-4, n_restarts_optimizer=2. Bias estimated from top-y 20% training holdout after fitting calibration models on lower-y 80%, then multiplied by 1.445.
 
 ## What works
 - Baseline Matern GP with target power transform is the best so far: val_mae 9.627624.
@@ -8,6 +8,7 @@ Key config: 90/10 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Amplifying the bias correction to 1.25x improved further: val_mae 7.576891.
 - Multiplier tuning found 1.445x best so far: 1.45x was close at val_mae 7.525804, 1.5x 7.530105, 1.55x 7.538147, 1.75x 7.656927, 1.4x 7.531981, 1.43x 7.526523, 1.47x 7.526719.
 - A small HistGradientBoosting blend with the bias-shifted GP improved substantially: 90% GP / 10% HistGradientBoosting reached val_mae 6.987598.
+- Increasing the HistGradientBoosting weight kept helping up to 50%: 20% HGB val_mae 6.498735, 30% HGB 6.123640, 50% HGB 5.809324.
 
 ## What doesn't work
 - DotProduct + RBF kernel replacing the baseline Matern kernel regressed badly: val_mae 13.050588.
@@ -23,6 +24,8 @@ Key config: 90/10 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - Shrinking the bias correction to 0.75x was worse than 1.0x: val_mae 8.115945.
 - Changing the calibration holdout from top 20% to top 15% or top 25% was worse: val_mae 7.578010 and 7.530244 respectively.
 - Averaging bias estimates across top 15/20/25% holdouts was worse than the single top-20 holdout: val_mae 7.532951.
+- TabPFN could not run without noninteractive license token/model access.
+- Extrapolation mixup MLP with tilted underprediction loss was much worse: val_mae 17.395464.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -31,6 +34,6 @@ Key config: 90/10 blend of bias-shifted GP and HistGradientBoostingRegressor. GP
 - HistGradientBoosting alone underpredicts high-y holdout more than GP on train-only diagnostics, but a small blend improves the final biased GP, likely adding local shape while GP+bias handles extrapolation.
 
 ## Unexplored directions
-- Tune GP/Hist blend weight around 10%.
+- Per human guidance, pause GP-specific improvement and try other guidance approaches: asymmetric/quantile regression, monotonic/NAM-style neural models, anchor points, NALU, or PySR residuals.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
 - Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
