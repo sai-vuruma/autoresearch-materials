@@ -1,11 +1,12 @@
 ## Current best
-val_mae: 7.576891 (commit 379ae8b)
-Key config: BiasShiftedGPRegressor, StandardScaler on X, Yeo-Johnson target transform, ConstantKernel * Matern(nu=1.5) + WhiteKernel, alpha=1e-4, n_restarts_optimizer=2; bias estimated from top-y 20% training holdout after fitting calibration GP on lower-y 80%, then multiplied by 1.25.
+val_mae: 7.525804 (commit fc0ecfe)
+Key config: BiasShiftedGPRegressor, StandardScaler on X, Yeo-Johnson target transform, ConstantKernel * Matern(nu=1.5) + WhiteKernel, alpha=1e-4, n_restarts_optimizer=2; bias estimated from top-y 20% training holdout after fitting calibration GP on lower-y 80%, then multiplied by 1.45.
 
 ## What works
 - Baseline Matern GP with target power transform is the best so far: val_mae 9.627624.
 - Bias-only calibration from a train-only high-y holdout substantially improves OOD validation: val_mae 7.778742. Internal diagnostic showed baseline GP underpredicted top-y training holdout by about 5.26 on average; applying that mean shift generalized better than affine calibration.
 - Amplifying the bias correction to 1.25x improved further: val_mae 7.576891.
+- Multiplier tuning found 1.45x best so far: 1.5x was close at val_mae 7.530105, 1.55x worse at 7.538147, 1.75x worse at 7.656927, and 1.4x slightly worse at 7.531981.
 
 ## What doesn't work
 - DotProduct + RBF kernel replacing the baseline Matern kernel regressed badly: val_mae 13.050588.
@@ -26,7 +27,7 @@ Key config: BiasShiftedGPRegressor, StandardScaler on X, Yeo-Johnson target tran
 - The baseline GP underpredicts high-y OOD regions. A constant bias correction learned from top-y train holdout is robust; slope/intercept correction is too aggressive.
 
 ## Unexplored directions
-- Tune the bias calibration split fraction and multiplier around 1.25x.
+- Fine tune bias multiplier around 1.45x, or try calibration split fractions around the current top-y 20%.
 - Try bias correction estimated from multiple high-y holdout folds and average the shifts.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
 - Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
