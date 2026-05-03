@@ -45,7 +45,7 @@ class NAMRegressor:
         self.x_scaler_ = StandardScaler()
         self.y_scaler_ = StandardScaler()
 
-    def _tilted_loss(self, pred, target, tau=0.999):
+    def _tilted_loss(self, pred, target, tau=0.995):
         err = target - pred
         return torch.maximum(tau * err, (tau - 1.0) * err).mean()
 
@@ -70,7 +70,7 @@ class NAMRegressor:
             idx = torch.randint(0, len(x), (batch_size,))
             pred = self.model_(x[idx])
             huber = F.smooth_l1_loss(pred, y_t[idx], beta=0.5)
-            loss = huber + 0.15 * self._tilted_loss(pred, y_t[idx])
+            loss = huber + 0.25 * self._tilted_loss(pred, y_t[idx])
 
             optimizer.zero_grad()
             loss.backward()
