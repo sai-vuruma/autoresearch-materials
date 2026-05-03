@@ -77,8 +77,8 @@ class GatedExtrapMLPRegressor:
             random_gate = torch.rand(batch_size)
             mixed_pred = self.model_(xb, random_gate)
             loss = F.smooth_l1_loss(mlp_pred, yb, beta=0.5)
-            loss = loss + 0.5 * F.smooth_l1_loss(linear_pred, yb, beta=0.5)
-            loss = loss + 0.5 * F.smooth_l1_loss(mixed_pred, yb, beta=0.5)
+            loss = loss + F.mse_loss(linear_pred, yb)
+            loss = loss + 0.25 * F.smooth_l1_loss(mixed_pred, yb, beta=0.5)
 
             optimizer.zero_grad()
             loss.backward()
