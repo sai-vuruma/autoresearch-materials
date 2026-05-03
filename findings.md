@@ -35,6 +35,7 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - EDL stagnation after 10 experiments: baseline evidential MLP val_mae 13.973953; lambda 0.001/0.1 worsened; extra gamma MSE worsened; tilted gamma loss helped slightly; smaller hidden sizes helped with hidden 32 best among standard EDL variants at 13.876219; hidden 16 worsened; LR 2e-3 worsened; hidden 32 with LR 5e-4 was best EDL at 12.283950 but still far below current best.
 - SNGP/Lipschitz stagnation after 10 experiments: baseline spectral encoder + 256 RFF val_mae 10.697754; direct spectral head collapsed to 20.631965; 512 RFF improved to 9.722637 and was best SNGP; 1024 RFF, latent 128, hidden 64, LR 5e-4/2e-3, and tilted loss all regressed.
 - DKL stagnation after 10 experiments: baseline exact gpytorch DKL val_mae 13.334652; lower LR 0.003 barely improved to 13.301977; latent 8/32 regressed; removing latent normalization improved to 9.861672 and was best DKL; 1500 training steps destabilized badly; smaller feature extractor regressed.
+- Gated ExtrapMLP stagnation after 10 experiments: baseline gated MLP val_mae 23.816717 because the linear inference path was untrained; training both paths improved to 14.838245; delaying fallback improved slightly to 14.493049 and was best in family. Stronger linear-path loss, 99th-percentile gate centers, smoother gates, empirical-gate training, RidgeCV fallback, earlier RidgeCV fallback, and gated residual-over-Ridge all regressed.
 
 ## Structural findings
 - The validation split appears sensitive to GP tail behavior; explicit additive linear kernel terms have not improved extrapolation despite guidance suggesting linear+local GP kernels as a strong general OOD baseline.
@@ -47,6 +48,7 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - SNGP distance-aware regularization helps less than expected for point MAE; random Fourier head is necessary, but capacity/LR tuning did not close the gap.
 - Important correction: the very low NAM results around val_mae 4.99 and 4.67 include high-y residual bias calibration, so they are calibration-heavy and should not be treated as clean structural wins.
 - DKL only became reasonable after removing latent normalization, which supports the guidance note that extrapolating means/kernels matter. Still far below simpler GP-HGB and calibrated NAM lines.
+- Gated extrapolating MLP is not competitive here. The fallback mechanism mostly trades one underfit neural path for another; using RidgeCV as the fallback did not help, so this family is stagnated.
 
 ## Unexplored directions
 - Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
