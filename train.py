@@ -19,7 +19,7 @@ from prepare import TIME_BUDGET, DATA_DIR, LABEL_COLUMN, evaluate_model
 
 
 class TTTNet(nn.Module):
-    def __init__(self, in_dim, hidden=128, latent=32):
+    def __init__(self, in_dim, hidden=64, latent=16):
         super().__init__()
         self.encoder = nn.Sequential(
             nn.Linear(in_dim, hidden),
