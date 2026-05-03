@@ -93,7 +93,7 @@ class WeightedConformalShiftRegressor:
     def predict(self, X):
         base_pred = self.model_.predict(X)
         midpoint_shift = 0.5 * (self.low_q_ + self.high_q_)
-        return base_pred + 1.25 * midpoint_shift
+        return base_pred + 1.5 * midpoint_shift
 
 
 t_start = time.time()
