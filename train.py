@@ -7,6 +7,7 @@ Usage: uv run train.py
 import os
 import time
 
+import numpy as np
 import pandas as pd
 from sklearn.compose import TransformedTargetRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -55,6 +56,27 @@ class GPRegressor:
         return self.model_.predict(X)
 
 
+class BiasShiftedGPRegressor(GPRegressor):
+    def fit(self, X, y):
+        y_array = np.asarray(y)
+        order = np.argsort(y_array)
+        n_train = int(len(y_array) * 0.8)
+        train_idx = order[:n_train]
+        calibration_idx = order[n_train:]
+
+        calibration_model = self._make_model()
+        calibration_model.fit(X.iloc[train_idx], y_array[train_idx])
+        calibration_pred = calibration_model.predict(X.iloc[calibration_idx])
+        self.bias_ = float(np.mean(calibration_pred - y_array[calibration_idx]))
+
+        self.model_ = self._make_model()
+        self.model_.fit(X, y)
+        return self
+
+    def predict(self, X):
+        return self.model_.predict(X) - self.bias_
+
+
 t_start = time.time()
 
 train_df = pd.read_csv(os.path.join(DATA_DIR, "train.csv"))
@@ -62,11 +84,11 @@ X_train = train_df.drop(columns=[LABEL_COLUMN])
 y_train = train_df[LABEL_COLUMN]
 
 print("Device: cpu")
-print("Model: GPRegressor")
+print("Model: BiasShiftedGPRegressor")
 print(f"Time budget:      {TIME_BUDGET}s")
 print(f"Training samples: {len(X_train):,}")
 
-model = GPRegressor()
+model = BiasShiftedGPRegressor()
 
 t_start_training = time.time()
 model.fit(X_train, y_train)
