@@ -35,7 +35,7 @@ class MLP(nn.Module):
 
 
 class RExMLPRegressor:
-    def __init__(self, random_state=42, rex_lambda=1.0, n_envs=2):
+    def __init__(self, random_state=42, rex_lambda=10.0, n_envs=2):
         self.random_state = random_state
         self.rex_lambda = rex_lambda
         self.n_envs = n_envs
