@@ -62,6 +62,7 @@ class GatedExtrapMLPRegressor:
 
         x = torch.from_numpy(x_np)
         y_t = torch.from_numpy(y_np)
+        train_gate = torch.from_numpy(self._gate(x_np).astype(np.float32))
         self.model_ = GatedNet(x.shape[1])
         optimizer = torch.optim.AdamW(self.model_.parameters(), lr=1e-3, weight_decay=1e-4)
         batch_size = 128
@@ -74,8 +75,8 @@ class GatedExtrapMLPRegressor:
             yb = y_t[idx]
             mlp_pred = self.model_(xb, torch.zeros(batch_size))
             linear_pred = self.model_(xb, torch.ones(batch_size))
-            random_gate = torch.rand(batch_size)
-            mixed_pred = self.model_(xb, random_gate)
+            empirical_gate = train_gate[idx]
+            mixed_pred = self.model_(xb, empirical_gate)
             loss = F.smooth_l1_loss(mlp_pred, yb, beta=0.5)
             loss = loss + F.mse_loss(linear_pred, yb)
             loss = loss + 0.25 * F.smooth_l1_loss(mixed_pred, yb, beta=0.5)
