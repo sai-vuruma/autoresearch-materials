@@ -1,16 +1,17 @@
 ## Current best
-val_mae: 4.990229 (commit 2af03bc, calibration-heavy NAM)
-Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2.8. This is the lowest logged val_mae but it is calibration-heavy / split-specific. Best less-calibrated GP-HGB circleback is val_mae 5.777955 (commit 618fa60). Clean NAM hidden 64 was val_mae 8.677804.
+val_mae: 4.861591 (commit 4138a03, clean NAM)
+Key config: NAM with per-feature hidden 64, tau 0.995 tilted underprediction loss, and tilted-loss coefficient 18.0. This uses no high-y residual-bias correction and is now the best logged result. The prior residual-biased NAM line reached 4.990229 at commit 2af03bc and the widened residual-biased NAM reached 4.671150 at commit b569090, but both are calibration-heavy / split-specific and should not be treated as clean architecture wins. Best GP-HGB bias-shift circleback is val_mae 5.777955 (commit 618fa60), also calibration-heavy.
 
 ## What works
-- Baseline Matern GP with target power transform is the best so far: val_mae 9.627624.
+- Baseline Matern GP with target power transform established the starting point: val_mae 9.627624.
 - Bias-only calibration from a train-only high-y holdout substantially improves OOD validation: val_mae 7.778742. Internal diagnostic showed baseline GP underpredicted top-y training holdout by about 5.26 on average; applying that mean shift generalized better than affine calibration.
 - Amplifying the bias correction to 1.25x improved further: val_mae 7.576891.
 - Multiplier tuning found 1.445x best so far: 1.45x was close at val_mae 7.525804, 1.5x 7.530105, 1.55x 7.538147, 1.75x 7.656927, 1.4x 7.531981, 1.43x 7.526523, 1.47x 7.526719.
 - A small HistGradientBoosting blend with the bias-shifted GP improved substantially: 90% GP / 10% HistGradientBoosting reached val_mae 6.987598.
 - Increasing the HistGradientBoosting weight kept helping up to 50%: 20% HGB val_mae 6.498735, 30% HGB 6.123640, 50% HGB 5.809324.
 - Circle-back on GP-HGB blend found 55% HGB best in that local sweep at val_mae 5.777955; 60% was 5.784802, 52.5% was 5.792492, and 70% was 5.918737. Still below current NAM best.
-- NAM residual-bias sweep reached the lowest logged val_mae 4.990229 at multiplier 2.8, but this should be treated as calibration-heavy rather than a clean architecture win. Clean hidden-96 NAM without residual bias was worse than clean hidden-64 NAM: 8.995952 vs 8.677804.
+- NAM residual-bias sweep reached val_mae 4.990229 at multiplier 2.8, and residual-biased width tuning reached 4.671150, but those should be treated as calibration-heavy rather than clean architecture wins. Clean hidden-96 NAM without residual bias was worse than clean hidden-64 NAM before the asymmetric-loss circle-back: 8.995952 vs 8.677804.
+- Clean NAM circle-back is the strongest non-gaming result: hidden 64 with tau 0.995 and tilted-loss coefficient 18.0 reached val_mae 4.861591, val_r2 0.468339, val_rmse 6.366535. This beat the GP-HGB bias-shift line and the earlier residual-biased NAM 2af03bc without using a high-y residual correction.
 
 ## What doesn't work
 - DotProduct + RBF kernel replacing the baseline Matern kernel regressed badly: val_mae 13.050588.
@@ -28,7 +29,7 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - Averaging bias estimates across top 15/20/25% holdouts was worse than the single top-20 holdout: val_mae 7.532951.
 - TabPFN could not run without noninteractive license token/model access.
 - Extrapolation mixup MLP with tilted underprediction loss was much worse: val_mae 17.395464.
-- Non-GP guidance attempts so far are below the GP/HGB best: quantile HGB val_mae 14.784369, anchor-point HGB 15.864447, NAM 8.677804.
+- Early non-GP guidance attempts were below the GP/HGB best: quantile HGB val_mae 14.784369, anchor-point HGB 15.864447, initial clean NAM 8.677804. Later clean NAM circle-back reversed this with val_mae 4.861591.
 - Monotonic-family tuning is active per human guidance. Pure positive-weight monotonic MLP was very poor (21.067557); partial monotonic with free path improved but still poor (17.404421); soft gradient-penalty monotonic MLP is best in family so far (11.782069 with penalty 0.2). Reducing penalty to 0.05 worsened to 12.623925.
 - Monotonic stagnation: 10 monotonic-family experiments all failed to approach the current best. Stronger penalty 0.5 worsened to 14.259600; feature masks at abs-corr >=0.4 and >=0.15 worsened to 12.826622 and 13.303174; longer training worsened to 12.306579; LR 3e-3 and 7.5e-4 worsened to 13.789898 and 14.383346.
 - NALU stagnation after 10 experiments: baseline hidden-32 NALU val_mae 12.687710; hidden 64 12.673314; log-input skip improved to 10.218379; hidden 32/128 with skip regressed; raw-input skip slightly improved to 10.092560; longer training, LR 5e-4/2e-3, and MSE loss regressed; tilted loss was best NALU at 8.393496 but still far below NAM/GP-HGB.
@@ -52,16 +53,16 @@ Key config: NAM with per-feature hidden 64 and high-y residual bias multiplier 2
 - NALU arithmetic units are not a good fit here. The only useful ingredient was a simple linear skip path; the arithmetic stack itself did not close the gap.
 - EDL uncertainty parameterization is not helping point MAE on this benchmark; it behaves like an underperforming MLP even after mean-loss and size/LR tuning.
 - SNGP distance-aware regularization helps less than expected for point MAE; random Fourier head is necessary, but capacity/LR tuning did not close the gap.
-- Important correction: the very low NAM results around val_mae 4.99 and 4.67 include high-y residual bias calibration, so they are calibration-heavy and should not be treated as clean structural wins.
+- Important correction: the very low earlier NAM results around val_mae 4.99 and 4.67 include high-y residual bias calibration, so those specific commits are calibration-heavy and should not be treated as clean structural wins. The current clean NAM best at 4.861591 does not use that residual-bias mechanism.
 - DKL only became reasonable after removing latent normalization, which supports the guidance note that extrapolating means/kernels matter. Still far below simpler GP-HGB and calibrated NAM lines.
 - Gated extrapolating MLP is not competitive here. The fallback mechanism mostly trades one underfit neural path for another; using RidgeCV as the fallback did not help, so this family is stagnated.
-- REx with train-only target proxy environments acts mostly like regularization. Compact networks help, but the approach still underpredicts the high-y OOD tail and does not approach clean GP-HGB performance.
+- REx with train-only target proxy environments acts mostly like regularization. Compact networks help, but the approach still underpredicts the high-y OOD tail and does not approach the clean NAM circle-back.
 - Delta Ridge MLP did not realize the guidance ranking on this split. The residual MLP appears to damage OOD extrapolation more often than it helps; plain Ridge extrapolation plus learned residuals stays in the 11.8+ MAE range.
-- TTT's useful ingredient here is auxiliary masked reconstruction as representation regularization, not test-time updates. The best TTT run is a clean structural neural result, but still below clean NAM and far below GP-HGB.
+- TTT's useful ingredient here is auxiliary masked reconstruction as representation regularization, not test-time updates. The best TTT run is a clean structural neural result, but still below the clean NAM circle-back.
 - JTT hard-sample reweighting is mostly harmful; the hard samples selected by early ERM loss do not behave like a useful OOD proxy group for this target-sorted split.
 - Clean NAM with a very strong asymmetric training loss now beats the earlier GP-HGB bias-shift line and the prior residual-biased NAM commit 2af03bc. This is a training-objective change, not a high-y residual correction, so it directly addresses the residual-gaming concern.
 
 ## Unexplored directions
 - Per human guidance: for each new approach, run at least 10 experiments or until crash/stagnation, then circle back to bests. Avoid high-y holdout calibration hacks unless explicitly testing calibration.
 - Try small ensembles/blends of Ridge, GP, and tree/boosting models if available in scikit-learn.
-- Try target quantile or shifted/asymmetric residual adjustments aimed at high-y OOD underprediction.
+- If continuing NAM, fine-tune the clean asymmetric objective near tau 0.995 / tilt weight 18.0, or try ensembles that preserve the no-residual-bias constraint.
